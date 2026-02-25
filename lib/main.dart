@@ -12,5 +12,6 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await Hive.initFlutter();
   await OfflineService.init();
+
   runApp(const ProviderScope(child: HostelHubApp()));
 }
