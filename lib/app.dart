@@ -5,9 +5,9 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/onboarding_screen.dart';
 import 'features/auth/screens/login_screen.dart';
-import 'features/students/screens/student_dashboard_screen.dart';
-import 'features/students/screens/profile_screen.dart';
-import 'features/students/screens/my_room_screen.dart';
+import 'features/student/screens/student_dashboard_screen.dart';
+import 'features/student/screens/profile_screen.dart';
+import 'features/student/screens/my_room_screen.dart';
 
 // ── Router Configuration ───────────────────────────────────────────────────
 final _router = GoRouter(
