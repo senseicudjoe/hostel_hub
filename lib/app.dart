@@ -5,6 +5,9 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/onboarding_screen.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/student/screens/student_dashboard_screen.dart';
+import 'features/student/screens/profile_screen.dart';
+import 'features/student/screens/my_room_screen.dart';
 
 // ── Router Configuration ───────────────────────────────────────────────────
 final _router = GoRouter(
@@ -16,16 +19,20 @@ final _router = GoRouter(
       builder: (context, state) => const OnboardingScreen(),
     ),
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-    // Placeholder for routes used in LoginScreen demo mode
     GoRoute(
       path: '/home',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Student Home Page'))),
+      builder: (context, state) => const StudentDashboardScreen(),
     ),
     GoRoute(
+      path: '/profile',
+      builder: (context, state) => const ProfileScreen(),
+    ),
+    GoRoute(path: '/room', builder: (context, state) => const MyRoomScreen()),
+    GoRoute(
       path: '/admin',
-      builder: (context, state) =>
-          const Scaffold(body: Center(child: Text('Admin Dashboard'))),
+      builder: (context, state) => const Scaffold(
+        body: Center(child: Text('Admin Dashboard Coming Soon')),
+      ),
     ),
   ],
 );
