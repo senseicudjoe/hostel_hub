@@ -1,0 +1,184 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../features/auth/screens/splash_screen.dart';
+import '../../features/auth/screens/onboarding_screen.dart';
+import '../../features/auth/screens/login_screen.dart';
+import '../../features/student/screens/student_shell_screen.dart';
+import '../../features/student/screens/student_dashboard_screen.dart';
+import '../../features/student/screens/my_room_screen.dart';
+import '../../features/student/screens/maintenance_list_screen.dart';
+import '../../features/student/screens/new_request_screen.dart';
+import '../../features/student/screens/request_detail_screen.dart';
+import '../../features/student/screens/shuttle_schedule_screen.dart';
+import '../../features/student/screens/my_bookings_screen.dart';
+import '../../features/student/screens/announcements_screen.dart';
+import '../../features/student/screens/profile_screen.dart';
+import '../../features/admin/screens/admin_shell_screen.dart';
+import '../../features/admin/screens/admin_dashboard_screen.dart';
+import '../../features/admin/screens/admin_room_management_screen.dart';
+import '../../features/admin/screens/admin_maintenance_screen.dart';
+import '../../features/admin/screens/compose_announcement_screen.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROUTER PROVIDER
+//
+// The app uses go_router for declarative navigation.
+// There are two StatefulShellRoutes (tab shells):
+//   1. Student shell: Home / Room / Maintenance / Shuttle / Profile
+//   2. Admin shell:   Dashboard / Rooms / Maintenance / Announcements / Profile
+//
+// Detail screens (e.g., maintenance/:id) live inside their branch so the
+// bottom nav stays visible — a common pattern in mobile apps.
+// ─────────────────────────────────────────────────────────────────────────────
+
+final routerProvider = Provider<GoRouter>((ref) {
+  return GoRouter(
+    initialLocation: '/splash',
+    debugLogDiagnostics: false,
+    routes: [
+      // ── Auth ──────────────────────────────────────────────────────────────
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+
+      // ── Student Shell ─────────────────────────────────────────────────────
+      // StatefulShellRoute.indexedStack keeps each tab's navigation stack
+      // alive when you switch tabs — so state is preserved.
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return StudentShell(navigationShell: navigationShell);
+        },
+        branches: [
+          // Tab 0 — Home / Dashboard
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/home',
+              builder: (context, state) => const StudentDashboardScreen(),
+            ),
+          ]),
+
+          // Tab 1 — My Room
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/room',
+              builder: (context, state) => const MyRoomScreen(),
+            ),
+          ]),
+
+          // Tab 2 — Maintenance (with sub-routes for new & detail)
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/maintenance',
+              builder: (context, state) => const MaintenanceListScreen(),
+              routes: [
+                GoRoute(
+                  path: 'new',
+                  builder: (context, state) => const NewRequestScreen(),
+                ),
+                GoRoute(
+                  path: ':id',
+                  builder: (context, state) => RequestDetailScreen(
+                    requestId: state.pathParameters['id'] ?? '',
+                  ),
+                ),
+              ],
+            ),
+          ]),
+
+          // Tab 3 — Shuttle (with sub-route for bookings)
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/shuttle',
+              builder: (context, state) => const ShuttleScheduleScreen(),
+              routes: [
+                GoRoute(
+                  path: 'bookings',
+                  builder: (context, state) => const MyBookingsScreen(),
+                ),
+              ],
+            ),
+          ]),
+
+          // Tab 4 — Profile
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/profile',
+              builder: (context, state) => const ProfileScreen(),
+            ),
+          ]),
+        ],
+      ),
+
+      // ── Standalone Student routes ─────────────────────────────────────────
+      GoRoute(
+        path: '/announcements',
+        builder: (context, state) => const AnnouncementsScreen(),
+      ),
+
+      // ── Admin Shell ───────────────────────────────────────────────────────
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return AdminShell(navigationShell: navigationShell);
+        },
+        branches: [
+          // Tab 0 — Admin Dashboard
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/admin',
+              builder: (context, state) => const AdminDashboardScreen(),
+            ),
+          ]),
+
+          // Tab 1 — Room Management
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/admin/rooms',
+              builder: (context, state) => const AdminRoomManagementScreen(),
+            ),
+          ]),
+
+          // Tab 2 — Maintenance Management
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/admin/maintenance',
+              builder: (context, state) => const AdminMaintenanceScreen(),
+            ),
+          ]),
+
+          // Tab 3 — Announcements (admin can compose from here)
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/admin/announcements',
+              builder: (context, state) => const AnnouncementsScreen(),
+              routes: [
+                GoRoute(
+                  path: 'compose',
+                  builder: (context, state) =>
+                      const ComposeAnnouncementScreen(),
+                ),
+              ],
+            ),
+          ]),
+
+          // Tab 4 — Profile (shared with student)
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/admin/profile',
+              builder: (context, state) => const ProfileScreen(),
+            ),
+          ]),
+        ],
+      ),
+    ],
+  );
+});

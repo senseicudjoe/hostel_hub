@@ -34,27 +34,27 @@ final isAdminProvider = Provider<bool>((ref) {
 class DemoUsers {
   /// A student resident in Unity Hall.
   static UserModel get student => UserModel(
-    uid: 'demo_student_001',
-    name: 'Kofi Mensah',
-    email: 'kofi.mensah@ashesi.edu.gh',
-    role: 'student',
-    hostel: 'Unity Hall',
-    roomNumber: 'U-204',
-    profileImageUrl: '',
-    fcmToken: '',
-    createdAt: DateTime.now(),
-  );
+        uid: 'demo_student_001',
+        name: 'Kofi Mensah',
+        email: 'kofi.mensah@ashesi.edu.gh',
+        role: 'student',
+        hostel: 'Unity Hall',
+        roomNumber: 'U-204',
+        profileImageUrl: '',
+        fcmToken: '',
+        createdAt: DateTime.now(),
+      );
 
   /// An SLE administrator.
   static UserModel get admin => UserModel(
-    uid: 'demo_admin_001',
-    name: 'Ama Boateng',
-    email: 'ama.boateng@ashesi.edu.gh',
-    role: 'admin',
-    hostel: '',
-    roomNumber: '',
-    profileImageUrl: '',
-    fcmToken: '',
-    createdAt: DateTime.now(),
-  );
+        uid: 'demo_admin_001',
+        name: 'Ama Boateng',
+        email: 'ama.boateng@ashesi.edu.gh',
+        role: 'admin',
+        hostel: '',
+        roomNumber: '',
+        profileImageUrl: '',
+        fcmToken: '',
+        createdAt: DateTime.now(),
+      );
 }

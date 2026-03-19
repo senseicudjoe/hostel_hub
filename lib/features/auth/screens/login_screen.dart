@@ -120,7 +120,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const Text(
                 'Sign in to your HostelHub account',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
               ),
 
               const SizedBox(height: 40),
@@ -167,8 +170,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 : Icons.visibility_off_outlined,
                           ),
                           onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword,
-                          ),
+                              () => _obscurePassword = !_obscurePassword),
                         ),
                       ),
                       validator: (v) {
@@ -193,11 +195,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(
-                              Icons.error_outline,
-                              color: AppColors.error,
-                              size: 18,
-                            ),
+                            const Icon(Icons.error_outline,
+                                color: AppColors.error, size: 18),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -272,8 +271,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
-                        'SSO integration requires Ashesi IdP setup',
-                      ),
+                          'SSO integration requires Ashesi IdP setup'),
                     ),
                   );
                 },
@@ -289,8 +287,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
-                        'Biometric login available after first sign-in',
-                      ),
+                          'Biometric login available after first sign-in'),
                     ),
                   );
                 },
@@ -307,17 +304,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                  border: Border.all(
+                      color: AppColors.primary.withOpacity(0.2)),
                 ),
                 child: Column(
                   children: [
                     Row(
                       children: [
-                        const Icon(
-                          Icons.preview_rounded,
-                          size: 18,
-                          color: AppColors.primary,
-                        ),
+                        const Icon(Icons.preview_rounded,
+                            size: 18, color: AppColors.primary),
                         const SizedBox(width: 8),
                         Text(
                           'Demo Mode — explore without an account',

@@ -155,10 +155,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.error, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         hintStyle: GoogleFonts.plusJakartaSans(
           color: AppColors.textHint,
           fontSize: 14,
@@ -185,13 +183,15 @@ class AppTheme {
           return GoogleFonts.plusJakartaSans(
             fontSize: 11,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            color: selected ? AppColors.primary : AppColors.textSecondary,
+            color:
+                selected ? AppColors.primary : AppColors.textSecondary,
           );
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
-            color: selected ? AppColors.primary : AppColors.textSecondary,
+            color:
+                selected ? AppColors.primary : AppColors.textSecondary,
             size: 22,
           );
         }),
@@ -200,12 +200,14 @@ class AppTheme {
       // ── Chips ────────────────────────────────────────────
       chipTheme: ChipThemeData(
         side: BorderSide.none,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         labelStyle: GoogleFonts.plusJakartaSans(
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       ),
 
       // ── Tabs ─────────────────────────────────────────────
