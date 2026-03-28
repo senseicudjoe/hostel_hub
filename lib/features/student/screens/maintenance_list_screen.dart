@@ -1,75 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+
+import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/maintenance_request.dart';
 import '../../../shared/widgets/status_chip.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-05 — Maintenance List Screen
 //
-// Shows all maintenance requests submitted by the student.
-// Tab filters: All / Pending / In Progress / Resolved
-// FAB to submit a new request.
+// Data: Firestore via [studentMaintenanceRequestsProvider].
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Mock data — in a real app this comes from FirestoreService.getStudentMaintenanceRequests()
-final _mockRequests = [
-  {
-    'id': 'REQ-001',
-    'title': 'Broken ceiling fan',
-    'category': 'Electrical',
-    'status': 'in_progress',
-    'room': 'U-204',
-    'date': 'Feb 15, 2026',
-    'description':
-        'The ceiling fan in room U-204 is making a loud grinding noise and sometimes stops working entirely.',
-  },
-  {
-    'id': 'REQ-002',
-    'title': 'Leaking pipe under sink',
-    'category': 'Plumbing',
-    'status': 'pending',
-    'room': 'U-204',
-    'date': 'Feb 18, 2026',
-    'description':
-        'Water is dripping steadily from the pipe joint under the bathroom sink.',
-  },
-  {
-    'id': 'REQ-003',
-    'title': 'Broken window lock',
-    'category': 'General',
-    'status': 'resolved',
-    'room': 'U-204',
-    'date': 'Feb 10, 2026',
-    'description': 'The window lock is broken and the window cannot be secured.',
-  },
-  {
-    'id': 'REQ-004',
-    'title': 'No hot water',
-    'category': 'Plumbing',
-    'status': 'acknowledged',
-    'room': 'U-204',
-    'date': 'Feb 20, 2026',
-    'description': 'Hot water has not been available for 3 days.',
-  },
-  {
-    'id': 'REQ-005',
-    'title': 'Power socket not working',
-    'category': 'Electrical',
-    'status': 'submitted',
-    'room': 'U-204',
-    'date': 'Feb 22, 2026',
-    'description': 'The power socket near my study desk has stopped working.',
-  },
-];
-
-class MaintenanceListScreen extends StatefulWidget {
+class MaintenanceListScreen extends ConsumerStatefulWidget {
   const MaintenanceListScreen({super.key});
 
   @override
-  State<MaintenanceListScreen> createState() => _MaintenanceListScreenState();
+  ConsumerState<MaintenanceListScreen> createState() =>
+      _MaintenanceListScreenState();
 }
 
-class _MaintenanceListScreenState extends State<MaintenanceListScreen>
+class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
@@ -85,15 +38,20 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen>
     super.dispose();
   }
 
-  List<Map<String, dynamic>> _filtered(String? status) {
-    if (status == null) return _mockRequests;
-    return _mockRequests
-        .where((r) => r['status'] == status)
-        .toList();
+  List<MaintenanceRequest> _filter(
+    List<MaintenanceRequest> all,
+    int tabIndex,
+  ) {
+    if (tabIndex == 0) return all;
+    const want = ['pending', 'in_progress', 'resolved'];
+    final s = want[tabIndex - 1];
+    return all.where((r) => r.status == s).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final async = ref.watch(studentMaintenanceRequestsProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Maintenance'),
@@ -107,14 +65,28 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _RequestList(requests: _filtered(null)),
-          _RequestList(requests: _filtered('pending')),
-          _RequestList(requests: _filtered('in_progress')),
-          _RequestList(requests: _filtered('resolved')),
-        ],
+      body: async.when(
+        data: (requests) {
+          return TabBarView(
+            controller: _tabController,
+            children: List.generate(4, (i) {
+              final filtered = _filter(requests, i);
+              return _RequestList(requests: filtered);
+            }),
+          );
+        },
+        loading: () =>
+            const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Could not load requests.\n$e',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.go('/maintenance/new'),
@@ -125,12 +97,8 @@ class _MaintenanceListScreenState extends State<MaintenanceListScreen>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Request List
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _RequestList extends StatelessWidget {
-  final List<Map<String, dynamic>> requests;
+  final List<MaintenanceRequest> requests;
   const _RequestList({required this.requests});
 
   @override
@@ -162,27 +130,26 @@ class _RequestList extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Request Card
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _RequestCard extends StatelessWidget {
-  final Map<String, dynamic> request;
+  final MaintenanceRequest request;
   const _RequestCard({required this.request});
 
   @override
   Widget build(BuildContext context) {
-    final categoryIcon = _categoryIcon(request['category'] as String);
+    final categoryIcon = _categoryIcon(request.category);
+    final dateStr = DateFormat('MMM d, y').format(request.createdAt);
+    final roomLabel = request.roomNumber.isNotEmpty
+        ? request.roomNumber
+        : '—';
 
     return GestureDetector(
-      onTap: () => context.go('/maintenance/${request['id']}'),
+      onTap: () => context.go('/maintenance/${request.requestId}'),
       child: Card(
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Category icon
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -191,9 +158,7 @@ class _RequestCard extends StatelessWidget {
                 ),
                 child: Icon(categoryIcon, color: AppColors.primary, size: 20),
               ),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,7 +168,7 @@ class _RequestCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            request['title'] as String,
+                            request.title,
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
@@ -214,12 +179,12 @@ class _RequestCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        StatusChip(status: request['status'] as String),
+                        StatusChip(status: request.status),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      request['description'] as String,
+                      request.description,
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -235,7 +200,7 @@ class _RequestCard extends StatelessWidget {
                             size: 13, color: AppColors.textSecondary),
                         const SizedBox(width: 4),
                         Text(
-                          request['room'] as String,
+                          roomLabel,
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
@@ -246,7 +211,7 @@ class _RequestCard extends StatelessWidget {
                             size: 13, color: AppColors.textSecondary),
                         const SizedBox(width: 4),
                         Text(
-                          request['date'] as String,
+                          dateStr,
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
@@ -257,7 +222,6 @@ class _RequestCard extends StatelessWidget {
                   ],
                 ),
               ),
-
               const Icon(Icons.chevron_right, color: AppColors.textHint),
             ],
           ),

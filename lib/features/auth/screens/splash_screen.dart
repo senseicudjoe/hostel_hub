@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../core/constants/app_constants.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// S-01 — Splash Screen
 ///
-/// Shown for ~2 seconds when the app launches.
-/// Displays the HostelHub logo with a simple fade-in animation.
-/// Then navigates to the onboarding screen.
-///
-/// In a real app, you would check auth state here and route to the
-/// appropriate dashboard if the user is already logged in.
-class SplashScreen extends StatefulWidget {
+/// Brief branding, then onboarding — or home/admin if a session exists
+/// (handled by [SessionBootstrap] + router redirect).
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
-  // AnimationController drives the fade-in of the logo.
   late final AnimationController _controller;
   late final Animation<double> _opacity;
 
@@ -27,19 +26,21 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // Set up a 600ms fade-in animation.
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
     _opacity = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-
-    // Start the animation immediately.
     _controller.forward();
 
-    // After 2.5 seconds total, navigate to onboarding.
     Future.delayed(const Duration(milliseconds: 2500), () {
-      if (mounted) context.go('/onboarding');
+      if (!mounted) return;
+      final user = ref.read(currentUserProvider);
+      if (user != null) {
+        context.go(user.role == AppConstants.roleAdmin ? '/admin' : '/home');
+      } else {
+        context.go('/onboarding');
+      }
     });
   }
 
@@ -59,7 +60,6 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── Logo Icon ────────────────────────────────
               Container(
                 width: 96,
                 height: 96,
@@ -80,10 +80,7 @@ class _SplashScreenState extends State<SplashScreen>
                   color: AppColors.primary,
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // ── App Name ─────────────────────────────────
               const Text(
                 'HostelHub',
                 style: TextStyle(
@@ -93,10 +90,7 @@ class _SplashScreenState extends State<SplashScreen>
                   letterSpacing: -1,
                 ),
               ),
-
               const SizedBox(height: 8),
-
-              // ── Tagline ───────────────────────────────────
               Text(
                 'Ashesi University',
                 style: TextStyle(

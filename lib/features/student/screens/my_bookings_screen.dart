@@ -1,58 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
+import '../../../core/constants/app_constants.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/shuttle_booking.dart';
 import '../../../shared/widgets/status_chip.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// S-09 — My Shuttle Bookings
-//
-// Shows the student's upcoming and past shuttle bookings.
-// Upcoming bookings show a cancel option.
-// Past bookings are greyed out.
+// S-09 — My Shuttle Bookings (Firestore)
 // ─────────────────────────────────────────────────────────────────────────────
 
-final _upcomingBookings = [
-  {
-    'id': 'BK-001',
-    'route': 'Main Gate → Academic Block',
-    'time': '14:30',
-    'date': 'Mon, Feb 23',
-    'status': 'confirmed',
-    'seat': '5',
-  },
-  {
-    'id': 'BK-002',
-    'route': 'Hostels → Academic Block',
-    'time': '07:30',
-    'date': 'Tue, Feb 24',
-    'status': 'confirmed',
-    'seat': '3',
-  },
-];
-
-final _pastBookings = [
-  {
-    'id': 'BK-003',
-    'route': 'Main Gate → Academic Block',
-    'time': '08:30',
-    'date': 'Fri, Feb 21',
-    'status': 'confirmed',
-    'seat': '12',
-  },
-  {
-    'id': 'BK-004',
-    'route': 'Academic Block → Main Gate',
-    'time': '17:30',
-    'date': 'Thu, Feb 20',
-    'status': 'cancelled',
-    'seat': '—',
-  },
-];
-
-class MyBookingsScreen extends StatelessWidget {
+class MyBookingsScreen extends ConsumerWidget {
   const MyBookingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(studentShuttleBookingsProvider);
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -65,39 +31,58 @@ class MyBookingsScreen extends StatelessWidget {
             ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            _BookingList(
-              bookings: _upcomingBookings,
-              showCancel: true,
-            ),
-            _BookingList(
-              bookings: _pastBookings,
-              showCancel: false,
-            ),
-          ],
+        body: async.when(
+          data: (bookings) {
+            final now = DateTime.now();
+            final upcoming = bookings
+                .where((b) =>
+                    b.status != AppConstants.statusCancelled &&
+                    b.bookingTime.isAfter(now.subtract(const Duration(hours: 1))))
+                .toList();
+            final past = bookings
+                .where((b) =>
+                    b.bookingTime.isBefore(now.subtract(const Duration(hours: 1))) ||
+                    b.status == AppConstants.statusCancelled)
+                .toList();
+
+            return TabBarView(
+              children: [
+                _BookingList(
+                  bookings: upcoming,
+                  showCancel: true,
+                  ref: ref,
+                ),
+                _BookingList(
+                  bookings: past,
+                  showCancel: false,
+                  ref: ref,
+                ),
+              ],
+            );
+          },
+          loading: () =>
+              const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error: $e')),
         ),
       ),
     );
   }
 }
 
-class _BookingList extends StatefulWidget {
-  final List<Map<String, dynamic>> bookings;
+class _BookingList extends StatelessWidget {
+  final List<ShuttleBooking> bookings;
   final bool showCancel;
+  final WidgetRef ref;
 
-  const _BookingList({required this.bookings, required this.showCancel});
-
-  @override
-  State<_BookingList> createState() => _BookingListState();
-}
-
-class _BookingListState extends State<_BookingList> {
-  final Set<String> _cancelled = {};
+  const _BookingList({
+    required this.bookings,
+    required this.showCancel,
+    required this.ref,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (widget.bookings.isEmpty) {
+    if (bookings.isEmpty) {
       return const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -117,138 +102,73 @@ class _BookingListState extends State<_BookingList> {
 
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: widget.bookings.length,
+      itemCount: bookings.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        final b = widget.bookings[i];
-        final isCancelled = _cancelled.contains(b['id']);
+      itemBuilder: (context, index) {
+        final b = bookings[index];
+        final dateStr = DateFormat('EEE, MMM d').format(b.bookingTime);
+        final timeStr = DateFormat('HH:mm').format(b.bookingTime);
 
         return Card(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryLight,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.directions_bus_rounded,
-                          color: AppColors.primary, size: 20),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            b['route'] as String,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.access_time_rounded,
-                                  size: 13,
-                                  color: AppColors.textSecondary),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${b['time']} · ${b['date']}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    StatusChip(
-                      status: isCancelled ? 'cancelled' : b['status'] as String,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-                const Divider(height: 1),
-                const SizedBox(height: 12),
-
-                // Boarding pass info
-                Row(
-                  children: [
-                    _InfoPill(
-                        icon: Icons.event_seat_rounded,
-                        label: 'Seat ${b['seat']}'),
-                    const SizedBox(width: 8),
-                    _InfoPill(
-                        icon: Icons.confirmation_num_outlined,
-                        label: b['id'] as String),
-                    const Spacer(),
-                    if (widget.showCancel && !isCancelled)
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.error,
-                          minimumSize: const Size(0, 32),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        '${b.pickupPoint} → ${b.destination}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
                         ),
-                        onPressed: () {
-                          setState(() => _cancelled.add(b['id'] as String));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Booking cancelled'),
-                            ),
-                          );
-                        },
-                        child: const Text('Cancel'),
                       ),
+                    ),
+                    StatusChip(status: b.status),
                   ],
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  '$dateStr · $timeStr',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (showCancel && b.status == 'confirmed') ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () async {
+                        try {
+                          await ref
+                              .read(firestoreServiceProvider)
+                              .cancelShuttleBooking(b.bookingId, b.scheduleId);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Booking cancelled')),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('$e')),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
         );
       },
-    );
-  }
-}
-
-class _InfoPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _InfoPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.input,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: AppColors.textSecondary),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

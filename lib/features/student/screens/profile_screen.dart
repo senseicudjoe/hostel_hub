@@ -211,8 +211,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
 
     if (confirm == true && context.mounted) {
+      try {
+        await ref.read(authServiceProvider).logout();
+      } catch (_) {}
+      try {
+        await ref.read(notificationServiceProvider).unsubscribeAll();
+      } catch (_) {}
       ref.read(currentUserProvider.notifier).state = null;
-      context.go('/login');
+      if (context.mounted) context.go('/login');
     }
   }
 }

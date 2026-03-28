@@ -1,9 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../models/user_model.dart';
+import '../constants/app_constants.dart';
+import '../providers/app_providers.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/onboarding_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/register_screen.dart';
 import '../../features/student/screens/student_shell_screen.dart';
 import '../../features/student/screens/student_dashboard_screen.dart';
 import '../../features/student/screens/my_room_screen.dart';
@@ -32,10 +37,56 @@ import '../../features/admin/screens/compose_announcement_screen.dart';
 // bottom nav stays visible — a common pattern in mobile apps.
 // ─────────────────────────────────────────────────────────────────────────────
 
+class GoRouterRefreshNotifier extends ChangeNotifier {
+  GoRouterRefreshNotifier(Ref ref) {
+    ref.listen<UserModel?>(currentUserProvider, (_, __) => notifyListeners());
+  }
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
+  final refresh = GoRouterRefreshNotifier(ref);
+
   return GoRouter(
     initialLocation: '/splash',
     debugLogDiagnostics: false,
+    refreshListenable: refresh,
+    redirect: (context, state) {
+      final user = ref.read(currentUserProvider);
+      final loc = state.matchedLocation;
+
+      if (user != null) {
+        if (loc == '/splash' || loc == '/onboarding') {
+          return user.role == AppConstants.roleAdmin ? '/admin' : '/home';
+        }
+        if (loc == '/login' || loc == '/register') {
+          return user.role == AppConstants.roleAdmin ? '/admin' : '/home';
+        }
+        final isAdmin = user.role == AppConstants.roleAdmin;
+        if (isAdmin) {
+          final onStudentShell = loc == '/home' ||
+              loc.startsWith('/room') ||
+              (loc.startsWith('/maintenance') && !loc.startsWith('/admin')) ||
+              loc.startsWith('/shuttle') ||
+              loc == '/profile' ||
+              loc == '/announcements';
+          if (onStudentShell) {
+            return loc == '/announcements'
+                ? '/admin/announcements'
+                : '/admin';
+          }
+        } else {
+          if (loc.startsWith('/admin')) return '/home';
+        }
+        return null;
+      }
+
+      final authPublic = loc == '/splash' ||
+          loc == '/onboarding' ||
+          loc == '/login' ||
+          loc == '/register';
+      if (!authPublic) return '/login';
+      return null;
+    },
     routes: [
       // ── Auth ──────────────────────────────────────────────────────────────
       GoRoute(
@@ -49,6 +100,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
       ),
 
       // ── Student Shell ─────────────────────────────────────────────────────

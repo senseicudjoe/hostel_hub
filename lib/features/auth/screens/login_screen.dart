@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../services/auth_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-02 — Login Screen
@@ -48,21 +48,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      final authService = AuthService();
-      final user = await authService.login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      final user = await ref.read(authServiceProvider).login(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
 
-      if (user != null && mounted) {
-        // Set the user in Riverpod state.
-        ref.read(currentUserProvider.notifier).state = user;
-        // Navigate based on role.
-        if (user.role == 'admin') {
-          context.go('/admin');
-        } else {
-          context.go('/home');
-        }
+      if (!mounted) return;
+
+      if (user == null) {
+        setState(() => _errorMessage =
+            'No profile found in the database for this account. '
+            'If you just registered, wait a moment and try again, '
+            'or contact SLE.');
+        return;
+      }
+
+      ref.read(currentUserProvider.notifier).state = user;
+      if (user.role == AppConstants.roleAdmin) {
+        context.go('/admin');
+      } else {
+        context.go('/home');
       }
     } catch (e) {
       setState(() => _errorMessage = e.toString());
@@ -214,13 +219,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     const SizedBox(height: 8),
 
-                    // Forgot password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {},
-                        child: const Text('Forgot password?'),
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () => context.push('/register'),
+                          child: const Text('Create account'),
+                        ),
+                        TextButton(
+                          onPressed: () {},
+                          child: const Text('Forgot password?'),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 8),

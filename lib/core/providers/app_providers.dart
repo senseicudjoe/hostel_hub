@@ -1,43 +1,112 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../models/announcement.dart';
+import '../../models/maintenance_request.dart';
+import '../../models/room_model.dart';
+import '../../models/shuttle_booking.dart';
 import '../../models/user_model.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/offline_service.dart';
+import '../../services/storage_service.dart';
+import '../constants/app_constants.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CURRENT USER
-// This is the single source of truth for who is logged in.
-// Screens read this to show personalised content.
+// SERVICES
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Holds the currently authenticated user (null = logged out).
+final authServiceProvider = Provider<AuthService>((_) => AuthService());
+final firestoreServiceProvider =
+    Provider<FirestoreService>((_) => FirestoreService());
+final storageServiceProvider = Provider<StorageService>((_) => StorageService());
+final notificationServiceProvider =
+    Provider<NotificationService>((_) => NotificationService());
+final offlineServiceProvider =
+    Provider<OfflineService>((_) => OfflineService());
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SESSION USER (single source of truth for UI + navigation)
+// Set by login / demo; hydrated on cold start if Firebase has a session.
+// ─────────────────────────────────────────────────────────────────────────────
+
 final currentUserProvider = StateProvider<UserModel?>((ref) => null);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DERIVED PROVIDERS
-// These compute values from currentUserProvider so we don't repeat ourselves.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Convenience: the user's role string ('student', 'admin', etc.)
 final userRoleProvider = Provider<String>((ref) {
-  return ref.watch(currentUserProvider)?.role ?? 'student';
+  return ref.watch(currentUserProvider)?.role ?? AppConstants.roleStudent;
 });
 
-/// Convenience: true if the logged-in user is an admin.
 final isAdminProvider = Provider<bool>((ref) {
-  return ref.watch(userRoleProvider) == 'admin';
+  final r = ref.watch(userRoleProvider);
+  return r == AppConstants.roleAdmin;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DEMO USERS
-// These are pre-built fake users so you can explore every screen
-// without needing a real Firebase connection.
+// FIREBASE AUTH (for session hydration; demo users do not use Firebase Auth)
+// ─────────────────────────────────────────────────────────────────────────────
+
+final firebaseAuthUserProvider = StreamProvider<User?>((ref) {
+  return ref.watch(authServiceProvider).authStateChanges;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA — all streams respect logged-in user where applicable
+// ─────────────────────────────────────────────────────────────────────────────
+
+final studentMaintenanceRequestsProvider =
+    StreamProvider<List<MaintenanceRequest>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return const Stream.empty();
+  return ref
+      .read(firestoreServiceProvider)
+      .getStudentMaintenanceRequests(user.uid);
+});
+
+final allMaintenanceRequestsProvider =
+    StreamProvider<List<MaintenanceRequest>>((ref) {
+  return ref.read(firestoreServiceProvider).getAllMaintenanceRequests();
+});
+
+/// Single maintenance request by id (detail screen).
+final maintenanceRequestProvider =
+    StreamProvider.family<MaintenanceRequest?, String>((ref, requestId) {
+  return ref.read(firestoreServiceProvider).watchMaintenanceRequest(requestId);
+});
+
+final announcementsForRoleProvider =
+    StreamProvider.family<List<Announcement>, String>((ref, role) {
+  return ref.read(firestoreServiceProvider).getAnnouncements(role);
+});
+
+final shuttleSchedulesProvider =
+    StreamProvider<List<Map<String, dynamic>>>((ref) {
+  return ref.read(firestoreServiceProvider).getShuttleSchedules();
+});
+
+final roomsProvider = StreamProvider<List<RoomModel>>((ref) {
+  return ref.read(firestoreServiceProvider).getRooms();
+});
+
+final studentShuttleBookingsProvider =
+    StreamProvider<List<ShuttleBooking>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return const Stream.empty();
+  return ref
+      .read(firestoreServiceProvider)
+      .getStudentShuttleBookings(user.uid);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEMO USERS (explore UI without Firebase credentials)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class DemoUsers {
-  /// A student resident in Unity Hall.
   static UserModel get student => UserModel(
         uid: 'demo_student_001',
         name: 'Kofi Mensah',
         email: 'kofi.mensah@ashesi.edu.gh',
-        role: 'student',
+        role: AppConstants.roleStudent,
         hostel: 'Unity Hall',
         roomNumber: 'U-204',
         profileImageUrl: '',
@@ -45,12 +114,11 @@ class DemoUsers {
         createdAt: DateTime.now(),
       );
 
-  /// An SLE administrator.
   static UserModel get admin => UserModel(
         uid: 'demo_admin_001',
         name: 'Ama Boateng',
         email: 'ama.boateng@ashesi.edu.gh',
-        role: 'admin',
+        role: AppConstants.roleAdmin,
         hostel: '',
         roomNumber: '',
         profileImageUrl: '',

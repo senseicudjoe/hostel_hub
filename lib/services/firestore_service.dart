@@ -168,12 +168,19 @@ class FirestoreService {
   }
 
   Stream<List<MaintenanceRequest>> getStudentMaintenanceRequests(String studentUid) {
+    // Note: Avoiding `.orderBy('createdAt')` here removes the need for a composite
+    // index (studentUid + createdAt). We sort client-side instead.
     return _db
         .collection(AppConstants.maintenanceCollection)
         .where('studentUid', isEqualTo: studentUid)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => MaintenanceRequest.fromMap(d.data())).toList());
+        .map((s) {
+      final list = s.docs
+          .map((d) => MaintenanceRequest.fromMap(d.data()))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
   }
 
   Stream<List<MaintenanceRequest>> getAllMaintenanceRequests() {
@@ -188,9 +195,25 @@ class FirestoreService {
     return _db
         .collection(AppConstants.maintenanceCollection)
         .where('status', isEqualTo: status)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => MaintenanceRequest.fromMap(d.data())).toList());
+        .map((s) {
+      final list = s.docs
+          .map((d) => MaintenanceRequest.fromMap(d.data()))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
+  }
+
+  Stream<MaintenanceRequest?> watchMaintenanceRequest(String requestId) {
+    return _db
+        .collection(AppConstants.maintenanceCollection)
+        .doc(requestId)
+        .snapshots()
+        .map((s) {
+      if (!s.exists || s.data() == null) return null;
+      return MaintenanceRequest.fromMap(s.data()!);
+    });
   }
 
   Future<void> updateMaintenanceStatus({
@@ -208,12 +231,27 @@ class FirestoreService {
   // ── SHUTTLE SCHEDULES ─────────────────────────────────────
 
   Stream<List<Map<String, dynamic>>> getShuttleSchedules() {
+    // Avoid composite index (status + departureTime): filter in query, sort in memory.
     return _db
         .collection(AppConstants.shuttleSchedulesCollection)
         .where('status', isEqualTo: 'active')
-        .orderBy('departureTime')
         .snapshots()
-        .map((s) => s.docs.map((d) => d.data()).toList());
+        .map((s) {
+      final list = s.docs.map((d) {
+        final m = Map<String, dynamic>.from(d.data());
+        m['scheduleId'] = d.id;
+        return m;
+      }).toList();
+      int depMillis(Map<String, dynamic> m) {
+        final v = m['departureTime'];
+        if (v is Timestamp) return v.millisecondsSinceEpoch;
+        if (v is DateTime) return v.millisecondsSinceEpoch;
+        return 0;
+      }
+
+      list.sort((a, b) => depMillis(a).compareTo(depMillis(b)));
+      return list;
+    });
   }
 
   Future<void> updateShuttleScheduleSeats(String scheduleId, int delta) async {
@@ -244,9 +282,13 @@ class FirestoreService {
     return _db
         .collection(AppConstants.shuttleBookingsCollection)
         .where('studentUid', isEqualTo: studentUid)
-        .orderBy('bookingTime', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => ShuttleBooking.fromMap(d.data())).toList());
+        .map((s) {
+      final list =
+          s.docs.map((d) => ShuttleBooking.fromMap(d.data())).toList();
+      list.sort((a, b) => b.bookingTime.compareTo(a.bookingTime));
+      return list;
+    });
   }
 
   Stream<List<ShuttleBooking>> getAllShuttleBookings() {
@@ -280,9 +322,12 @@ class FirestoreService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((s) => s.docs
-        .map((d) => Announcement.fromMap(d.data()))
-        .where((a) => a.targetRole == 'all' || a.targetRole == role)
-        .toList());
+            .map((d) => Announcement.fromMap(d.data()))
+            .where((a) {
+              if (role == AppConstants.roleAdmin) return true;
+              return a.targetRole == 'all' || a.targetRole == role;
+            })
+            .toList());
   }
 
   Future<void> postAnnouncement(Announcement announcement) async {

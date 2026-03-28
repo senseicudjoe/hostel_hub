@@ -2,25 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+
+import '../../../models/announcement.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-03 — Student Dashboard
 //
-// The first thing a student sees after logging in.
-//   • Personalised greeting with date
-//   • Room summary card
-//   • Quick-action grid (4 tiles)
-//   • Announcements ticker / preview list
+// Announcements: Firestore via [announcementsForRoleProvider].
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Mock announcements shown in the ticker.
-const _announcements = [
-  '📢 Water outage in Unity Hall — Saturday 6AM–12PM',
-  '🔍 Annual hostel inspection Mon–Wed next week',
-  '🚌 New shuttle route added from March 1st',
-];
 
 class StudentDashboardScreen extends ConsumerStatefulWidget {
   const StudentDashboardScreen({super.key});
@@ -37,6 +29,8 @@ class _StudentDashboardScreenState
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
+    final announcementsAsync =
+        ref.watch(announcementsForRoleProvider(AppConstants.roleStudent));
     final firstName = user?.name.split(' ').first ?? 'Student';
     final now = DateTime.now();
     final greeting = _greeting(now.hour);
@@ -154,14 +148,37 @@ class _StudentDashboardScreenState
                   ],
                 ),
                 const SizedBox(height: 8),
-                _AnnouncementTicker(
-                  message: _announcements[_tickerIndex],
-                  onTap: () => setState(() =>
-                      _tickerIndex = (_tickerIndex + 1) % _announcements.length),
+                announcementsAsync.when(
+                  data: (list) {
+                    if (list.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'No announcements yet.',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      );
+                    }
+                    final ticker = list
+                        .map((a) => '📢 ${a.title}')
+                        .toList();
+                    final i = _tickerIndex % ticker.length;
+                    return _AnnouncementTicker(
+                      message: ticker[i],
+                      onTap: () => setState(() {
+                        _tickerIndex = (_tickerIndex + 1) % ticker.length;
+                      }),
+                    );
+                  },
+                  loading: () => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: LinearProgressIndicator(),
+                  ),
+                  error: (_, __) => const SizedBox.shrink(),
                 ),
 
                 const SizedBox(height: 12),
-                ..._announcementPreviews,
+                ..._announcementPreviews(announcementsAsync),
                 const SizedBox(height: 20),
               ]),
             ),
@@ -178,24 +195,28 @@ class _StudentDashboardScreenState
     return 'Good evening';
   }
 
-  // Preview cards for recent announcements.
-  List<Widget> get _announcementPreviews => const [
-        _AnnouncementPreviewCard(
-          title: 'Water Outage Notice',
-          body:
-              'There will be a scheduled water outage in Unity Hall on Saturday from 6AM–12PM.',
-          date: 'Today',
-          isUnread: true,
-        ),
-        SizedBox(height: 8),
-        _AnnouncementPreviewCard(
-          title: 'Hostel Inspection Next Week',
-          body:
-              'The annual hostel room inspection will take place Mon–Wed next week.',
-          date: 'Feb 20',
-          isUnread: false,
-        ),
-      ];
+  List<Widget> _announcementPreviews(
+    AsyncValue<List<Announcement>> announcementsAsync,
+  ) {
+    return announcementsAsync.maybeWhen(
+      data: (list) {
+        if (list.isEmpty) return <Widget>[];
+        return list.take(2).map((a) {
+          final date = DateFormat('MMM d').format(a.createdAt);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _AnnouncementPreviewCard(
+              title: a.title,
+              body: a.body,
+              date: date,
+              isUnread: false,
+            ),
+          );
+        }).toList();
+      },
+      orElse: () => <Widget>[],
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

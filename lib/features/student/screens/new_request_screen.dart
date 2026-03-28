@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/maintenance_request.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-06 — New Maintenance Request Screen
@@ -36,6 +40,7 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
+  final _uuid = const Uuid();
 
   String? _selectedCategory;
   bool _hasPhoto = false;
@@ -50,21 +55,67 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final user = ref.read(currentUserProvider);
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to submit.')),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
-    // Simulate network call.
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final fs = ref.read(firestoreServiceProvider);
+      final alloc = await fs.getStudentAllocation(user.uid);
+      final roomId =
+          alloc?['roomId'] as String? ?? 'unassigned_${user.uid}';
 
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
+      final requestId = 'req_${_uuid.v4().replaceAll('-', '').substring(0, 12)}';
+      List<String> imageUrls = [];
+      if (_hasPhoto) {
+        final file = await ref.read(storageServiceProvider).pickImage();
+        if (file != null) {
+          imageUrls = await ref
+              .read(storageServiceProvider)
+              .uploadMaintenanceImages(requestId, [file]);
+        }
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Request submitted! You\'ll be notified of updates.'),
-        backgroundColor: AppColors.success,
-      ),
-    );
-    context.pop();
+      final now = DateTime.now();
+      final request = MaintenanceRequest(
+        requestId: requestId,
+        studentUid: user.uid,
+        roomId: roomId,
+        title: _titleController.text.trim(),
+        description: _descController.text.trim(),
+        category: _selectedCategory ?? 'General',
+        roomNumber: user.roomNumber,
+        hostelName: user.hostel,
+        imageUrls: imageUrls,
+        status: AppConstants.statusPending,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await fs.submitMaintenanceRequest(request);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Request submitted! You\'ll be notified of updates.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not submit: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
