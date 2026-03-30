@@ -25,7 +25,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // Notification preferences
   bool _maintenanceNotifs = true;
-  bool _shuttleNotifs = true;
   bool _announcementNotifs = true;
 
   // Preferences
@@ -73,15 +72,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 value: _maintenanceNotifs,
                 onChanged: (v) =>
                     setState(() => _maintenanceNotifs = v),
-              ),
-              const Divider(height: 1),
-              _ToggleTile(
-                icon: Icons.directions_bus_outlined,
-                title: 'Shuttle Reminders',
-                subtitle: '15 minutes before your booked departure',
-                value: _shuttleNotifs,
-                onChanged: (v) =>
-                    setState(() => _shuttleNotifs = v),
               ),
               const Divider(height: 1),
               _ToggleTile(

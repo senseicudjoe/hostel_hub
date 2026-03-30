@@ -17,22 +17,6 @@
       ]
     },
     {
-      "collectionGroup": "shuttle_schedules",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "departureTime", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "shuttle_bookings",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "studentUid", "order": "ASCENDING" },
-        { "fieldPath": "bookingTime", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "allocations",
       "queryScope": "COLLECTION",
       "fields": [

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/announcement.dart';
 import '../../models/maintenance_request.dart';
 import '../../models/room_model.dart';
-import '../../models/shuttle_booking.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
@@ -79,22 +78,8 @@ final announcementsForRoleProvider =
   return ref.read(firestoreServiceProvider).getAnnouncements(role);
 });
 
-final shuttleSchedulesProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) {
-  return ref.read(firestoreServiceProvider).getShuttleSchedules();
-});
-
 final roomsProvider = StreamProvider<List<RoomModel>>((ref) {
   return ref.read(firestoreServiceProvider).getRooms();
-});
-
-final studentShuttleBookingsProvider =
-    StreamProvider<List<ShuttleBooking>>((ref) {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return const Stream.empty();
-  return ref
-      .read(firestoreServiceProvider)
-      .getStudentShuttleBookings(user.uid);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

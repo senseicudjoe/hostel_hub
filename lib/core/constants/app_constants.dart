@@ -4,8 +4,6 @@ class AppConstants {
   static const String roomsCollection              = 'rooms';
   static const String allocationsCollection        = 'allocations';
   static const String maintenanceCollection        = 'maintenance_requests';
-  static const String shuttleSchedulesCollection   = 'shuttle_schedules';
-  static const String shuttleBookingsCollection    = 'shuttle_bookings';
   static const String announcementsCollection      = 'announcements';
 
   // User roles
@@ -44,13 +42,5 @@ class AppConstants {
     'Unity Hall',
     'Freedom Hall',
     'Independence Hall',
-  ];
-
-  // Shuttle pickup points
-  static const List<String> shuttlePoints = [
-    'Unity Hall',
-    'Freedom Hall',
-    'Independence Hall',
-    'Main Academic Block',
   ];
 }

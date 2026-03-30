@@ -316,10 +316,10 @@ class _QuickActionGrid extends StatelessWidget {
           onTap: () => context.go('/maintenance/new'),
         ),
         _QuickActionTile(
-          icon: Icons.directions_bus_rounded,
-          label: 'Book\nShuttle',
+          icon: Icons.meeting_room_rounded,
+          label: 'Rooms',
           color: const Color(0xFF1565C0),
-          onTap: () => context.go('/shuttle'),
+          onTap: () => context.go('/room'),
         ),
         _QuickActionTile(
           icon: Icons.qr_code_scanner_rounded,

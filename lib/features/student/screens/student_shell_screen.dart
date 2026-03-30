@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 //
 // This is the persistent scaffold that wraps all student tab screens.
 // The NavigationBar at the bottom lets students switch between:
-//   Home → Room → Maintenance → Shuttle → Profile
+//   Home → Room → Maintenance → Profile
 //
 // StatefulShellRoute keeps each tab's state alive — so if you scroll
 // down on the Maintenance list and switch tabs, your scroll position
@@ -25,7 +25,7 @@ class StudentShell extends StatelessWidget {
       // The body IS the currently selected tab's screen.
       body: navigationShell,
 
-      // Bottom navigation bar — 5 destinations matching the PRD.
+      // Bottom navigation bar — 4 destinations.
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: (index) {
@@ -52,11 +52,6 @@ class StudentShell extends StatelessWidget {
             icon: Icon(Icons.build_outlined),
             selectedIcon: Icon(Icons.build_rounded),
             label: 'Requests',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.directions_bus_outlined),
-            selectedIcon: Icon(Icons.directions_bus_rounded),
-            label: 'Shuttle',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

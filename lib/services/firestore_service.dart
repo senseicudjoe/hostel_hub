@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/maintenance_request.dart';
-import '../models/shuttle_booking.dart';
 import '../models/announcement.dart';
 import '../models/room_model.dart';
 import '../models/user_model.dart';
@@ -226,92 +225,6 @@ class FirestoreService {
       'assignedTo': assignedTo,
       'updatedAt':  FieldValue.serverTimestamp(),
     });
-  }
-
-  // ── SHUTTLE SCHEDULES ─────────────────────────────────────
-
-  Stream<List<Map<String, dynamic>>> getShuttleSchedules() {
-    // Avoid composite index (status + departureTime): filter in query, sort in memory.
-    return _db
-        .collection(AppConstants.shuttleSchedulesCollection)
-        .where('status', isEqualTo: 'active')
-        .snapshots()
-        .map((s) {
-      final list = s.docs.map((d) {
-        final m = Map<String, dynamic>.from(d.data());
-        m['scheduleId'] = d.id;
-        return m;
-      }).toList();
-      int depMillis(Map<String, dynamic> m) {
-        final v = m['departureTime'];
-        if (v is Timestamp) return v.millisecondsSinceEpoch;
-        if (v is DateTime) return v.millisecondsSinceEpoch;
-        return 0;
-      }
-
-      list.sort((a, b) => depMillis(a).compareTo(depMillis(b)));
-      return list;
-    });
-  }
-
-  Future<void> updateShuttleScheduleSeats(String scheduleId, int delta) async {
-    await _db
-        .collection(AppConstants.shuttleSchedulesCollection)
-        .doc(scheduleId)
-        .update({'bookedSeats': FieldValue.increment(delta)});
-  }
-
-  // ── SHUTTLE BOOKINGS ──────────────────────────────────────
-
-  Future<void> bookShuttle(ShuttleBooking booking) async {
-    final batch = _db.batch();
-
-    batch.set(
-      _db.collection(AppConstants.shuttleBookingsCollection).doc(booking.bookingId),
-      booking.toMap(),
-    );
-    batch.update(
-      _db.collection(AppConstants.shuttleSchedulesCollection).doc(booking.scheduleId),
-      {'bookedSeats': FieldValue.increment(1)},
-    );
-
-    await batch.commit();
-  }
-
-  Stream<List<ShuttleBooking>> getStudentShuttleBookings(String studentUid) {
-    return _db
-        .collection(AppConstants.shuttleBookingsCollection)
-        .where('studentUid', isEqualTo: studentUid)
-        .snapshots()
-        .map((s) {
-      final list =
-          s.docs.map((d) => ShuttleBooking.fromMap(d.data())).toList();
-      list.sort((a, b) => b.bookingTime.compareTo(a.bookingTime));
-      return list;
-    });
-  }
-
-  Stream<List<ShuttleBooking>> getAllShuttleBookings() {
-    return _db
-        .collection(AppConstants.shuttleBookingsCollection)
-        .orderBy('bookingTime', descending: true)
-        .snapshots()
-        .map((s) => s.docs.map((d) => ShuttleBooking.fromMap(d.data())).toList());
-  }
-
-  Future<void> cancelShuttleBooking(String bookingId, String scheduleId) async {
-    final batch = _db.batch();
-
-    batch.update(
-      _db.collection(AppConstants.shuttleBookingsCollection).doc(bookingId),
-      {'status': AppConstants.statusCancelled},
-    );
-    batch.update(
-      _db.collection(AppConstants.shuttleSchedulesCollection).doc(scheduleId),
-      {'bookedSeats': FieldValue.increment(-1)},
-    );
-
-    await batch.commit();
   }
 
   // ── ANNOUNCEMENTS ─────────────────────────────────────────

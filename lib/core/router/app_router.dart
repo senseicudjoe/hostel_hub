@@ -15,8 +15,6 @@ import '../../features/student/screens/my_room_screen.dart';
 import '../../features/student/screens/maintenance_list_screen.dart';
 import '../../features/student/screens/new_request_screen.dart';
 import '../../features/student/screens/request_detail_screen.dart';
-import '../../features/student/screens/shuttle_schedule_screen.dart';
-import '../../features/student/screens/my_bookings_screen.dart';
 import '../../features/student/screens/announcements_screen.dart';
 import '../../features/student/screens/profile_screen.dart';
 import '../../features/admin/screens/admin_shell_screen.dart';
@@ -30,7 +28,7 @@ import '../../features/admin/screens/compose_announcement_screen.dart';
 //
 // The app uses go_router for declarative navigation.
 // There are two StatefulShellRoutes (tab shells):
-//   1. Student shell: Home / Room / Maintenance / Shuttle / Profile
+//   1. Student shell: Home / Room / Maintenance / Profile
 //   2. Admin shell:   Dashboard / Rooms / Maintenance / Announcements / Profile
 //
 // Detail screens (e.g., maintenance/:id) live inside their branch so the
@@ -66,7 +64,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           final onStudentShell = loc == '/home' ||
               loc.startsWith('/room') ||
               (loc.startsWith('/maintenance') && !loc.startsWith('/admin')) ||
-              loc.startsWith('/shuttle') ||
               loc == '/profile' ||
               loc == '/announcements';
           if (onStudentShell) {
@@ -150,21 +147,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ]),
 
-          // Tab 3 — Shuttle (with sub-route for bookings)
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: '/shuttle',
-              builder: (context, state) => const ShuttleScheduleScreen(),
-              routes: [
-                GoRoute(
-                  path: 'bookings',
-                  builder: (context, state) => const MyBookingsScreen(),
-                ),
-              ],
-            ),
-          ]),
-
-          // Tab 4 — Profile
+          // Tab 3 — Profile
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/profile',
