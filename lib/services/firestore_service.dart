@@ -81,6 +81,40 @@ class FirestoreService {
         .update({'status': status});
   }
 
+  /// Live updates when the room document changes (occupancy, status, etc.).
+  Stream<RoomModel?> watchRoom(String roomId) {
+    return _db
+        .collection(AppConstants.roomsCollection)
+        .doc(roomId)
+        .snapshots()
+        .map((s) {
+      if (!s.exists || s.data() == null) return null;
+      final m = Map<String, dynamic>.from(s.data()!);
+      m['roomId'] = (m['roomId'] as String?)?.isNotEmpty == true
+          ? m['roomId']
+          : s.id;
+      return RoomModel.fromMap(m);
+    });
+  }
+
+  /// Resolves the student's active allocation → room document stream.
+  Stream<RoomModel?> watchStudentRoom(String studentUid) {
+    return _db
+        .collection(AppConstants.allocationsCollection)
+        .where('studentUid', isEqualTo: studentUid)
+        .where('status', isEqualTo: 'active')
+        .limit(1)
+        .snapshots()
+        .asyncExpand((snap) {
+      if (snap.docs.isEmpty) return Stream<RoomModel?>.value(null);
+      final roomId = snap.docs.first.data()['roomId'] as String?;
+      if (roomId == null || roomId.isEmpty) {
+        return Stream<RoomModel?>.value(null);
+      }
+      return watchRoom(roomId);
+    });
+  }
+
   // ── ALLOCATIONS ───────────────────────────────────────────
 
   Future<Map<String, dynamic>?> getStudentAllocation(String studentUid) async {
@@ -107,6 +141,8 @@ class FirestoreService {
     required String roomId,
     required String hostelName,
     required String roomNumber,
+    required int capacity,
+    required int currentOccupants,
   }) async {
     final id = 'alloc_${_uuid.v4().substring(0, 8)}';
     final batch = _db.batch();
@@ -122,10 +158,14 @@ class FirestoreService {
       'status':       'active',
     });
 
-    // Update room
+    // Update room — only mark as occupied when the room is actually full
+    final newOccupants = currentOccupants + 1;
+    final newStatus = newOccupants >= capacity
+        ? AppConstants.roomOccupied
+        : AppConstants.roomAvailable;
     batch.update(_db.collection(AppConstants.roomsCollection).doc(roomId), {
       'currentOccupants': FieldValue.increment(1),
-      'status':           AppConstants.roomOccupied,
+      'status':           newStatus,
     });
 
     // Update student profile

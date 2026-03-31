@@ -11,6 +11,7 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/student/screens/student_shell_screen.dart';
 import '../../features/student/screens/student_dashboard_screen.dart';
+import '../../features/student/screens/explore_rooms_screen.dart';
 import '../../features/student/screens/my_room_screen.dart';
 import '../../features/student/screens/maintenance_list_screen.dart';
 import '../../features/student/screens/new_request_screen.dart';
@@ -28,7 +29,7 @@ import '../../features/admin/screens/compose_announcement_screen.dart';
 //
 // The app uses go_router for declarative navigation.
 // There are two StatefulShellRoutes (tab shells):
-//   1. Student shell: Home / Room / Maintenance / Profile
+//   1. Student shell: Home / Explore / My Room / Maintenance / Profile
 //   2. Admin shell:   Dashboard / Rooms / Maintenance / Announcements / Profile
 //
 // Detail screens (e.g., maintenance/:id) live inside their branch so the
@@ -119,7 +120,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ]),
 
-          // Tab 1 — My Room
+          // Tab 1 — Explore rooms (booking)
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/explore',
+              builder: (context, state) => const ExploreRoomsScreen(),
+            ),
+          ]),
+
+          // Tab 2 — My Room
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/room',
@@ -127,7 +136,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ]),
 
-          // Tab 2 — Maintenance (with sub-routes for new & detail)
+          // Tab 3 — Maintenance (with sub-routes for new & detail)
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/maintenance',
@@ -147,7 +156,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ]),
 
-          // Tab 3 — Profile
+          // Tab 4 — Profile
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/profile',

@@ -1,0 +1,15 @@
+{
+  "name": "hostelhub-firestore-tools",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "seed:rooms:dry": "node seed_rooms.js --file rooms.seed.json --dry-run",
+    "seed:rooms": "node seed_rooms.js --file rooms.seed.json --merge",
+    "seed:rooms:adc:dry": "node seed_rooms.js --file rooms.seed.json --dry-run --project hostelhub-976ee",
+    "seed:rooms:adc": "node seed_rooms.js --file rooms.seed.json --merge --project hostelhub-976ee"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.5.0"
+  }
+}
+

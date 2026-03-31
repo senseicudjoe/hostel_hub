@@ -319,7 +319,7 @@ class _QuickActionGrid extends StatelessWidget {
           icon: Icons.meeting_room_rounded,
           label: 'Rooms',
           color: const Color(0xFF1565C0),
-          onTap: () => context.go('/room'),
+          onTap: () => context.go('/explore'),
         ),
         _QuickActionTile(
           icon: Icons.qr_code_scanner_rounded,

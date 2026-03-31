@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/room_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-04 — My Room Screen
 //
-// Displays:
-//   • Room details (hostel, number, floor, bed)
-//   • Roommate info card
-//   • QR code placeholder (scan to identify room)
-//   • Navigate to hostel button
+// Shows the student's assigned room from Firestore (allocation → rooms doc)
+// when available; otherwise falls back to profile fields (e.g. demo mode).
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MyRoomScreen extends ConsumerWidget {
@@ -19,6 +20,10 @@ class MyRoomScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
+    final roomAsync = ref.watch(myRoomProvider);
+    final hasRoom =
+        (user?.roomNumber.trim().isNotEmpty ?? false) &&
+        (user?.hostel.trim().isNotEmpty ?? false);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -41,33 +46,141 @@ class MyRoomScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Room Details Card ─────────────────────────────
-            _RoomDetailsCard(user: user),
+            if (!hasRoom) ...[
+              _NoRoomCard(
+                onExplore: () => context.go('/explore'),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // ── Room details (from Firestore live room doc when possible) ──
+            roomAsync.when(
+              loading: () {
+                if (!hasRoom) {
+                  return const SizedBox.shrink();
+                }
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              },
+              error: (_, __) => _RoomDetailsCard(
+                user: user,
+                room: null,
+                hasRoom: hasRoom,
+              ),
+              data: (room) => _RoomDetailsCard(
+                user: user,
+                room: room,
+                hasRoom: hasRoom,
+              ),
+            ),
 
             const SizedBox(height: 16),
 
-            // ── Roommate Card ─────────────────────────────────
-            const _RoommateCard(),
+            // ── Occupancy / sharing (skip extra spinner while main block loads) ──
+            if (hasRoom)
+              roomAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const _OccupancyPlaceholderCard(),
+                data: (room) {
+                  if (room == null) return const _OccupancyPlaceholderCard();
+                  return _OccupancyCard(room: room);
+                },
+              ),
 
-            const SizedBox(height: 16),
+            if (hasRoom) const SizedBox(height: 16),
 
-            // ── QR Code Card ──────────────────────────────────
-            _QRCodeCard(roomNumber: user?.roomNumber ?? 'U-204'),
+            // ── QR Code ─────────────────────────────────────────────────────────
+            if (hasRoom) ...[
+              _QRCodeCard(
+                roomNumber: user?.roomNumber ?? '',
+                qrCode: roomAsync.maybeWhen(
+                  data: (r) => r?.qrCode,
+                  orElse: () => null,
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
 
-            const SizedBox(height: 16),
-
-            // ── Navigate Button ───────────────────────────────
             ElevatedButton.icon(
               icon: const Icon(Icons.navigation_rounded),
               label: const Text('Navigate to Hostel'),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                        'Opening maps navigation to Unity Hall...'),
+              onPressed: hasRoom
+                  ? () {
+                      final name = roomAsync.maybeWhen(
+                        data: (r) => r?.hostelName,
+                        orElse: () => null,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Opening maps to ${name ?? user?.hostel ?? 'hostel'}...',
+                          ),
+                        ),
+                      );
+                    }
+                  : null,
+            ),
+
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.search_rounded),
+              label: Text(hasRoom ? 'Explore other rooms' : 'Explore rooms'),
+              onPressed: () => context.go('/explore'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoRoomCard extends StatelessWidget {
+  final VoidCallback onExplore;
+  const _NoRoomCard({required this.onExplore});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.warning.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.info_outline, color: AppColors.warning),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No room assigned yet',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                );
-              },
+                  SizedBox(height: 4),
+                  Text(
+                    'Explore available rooms and book one.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton(
+              onPressed: onExplore,
+              child: const Text('Explore'),
             ),
           ],
         ),
@@ -80,10 +193,59 @@ class MyRoomScreen extends ConsumerWidget {
 
 class _RoomDetailsCard extends StatelessWidget {
   final dynamic user;
-  const _RoomDetailsCard({this.user});
+  final RoomModel? room;
+  final bool hasRoom;
+
+  const _RoomDetailsCard({
+    this.user,
+    required this.room,
+    required this.hasRoom,
+  });
+
+  String _floorLabel() {
+    if (room == null) return '—';
+    final f = room!.floor;
+    if (f <= 0) return '—';
+    return 'Floor $f';
+  }
+
+  String _statusLabel() {
+    if (room == null) {
+      return hasRoom ? 'Assigned' : 'Unassigned';
+    }
+    switch (room!.status) {
+      case AppConstants.roomAvailable:
+        return 'Available';
+      case AppConstants.roomOccupied:
+        return 'Occupied';
+      case AppConstants.roomMaintenance:
+        return 'Maintenance';
+      default:
+        return room!.status;
+    }
+  }
+
+  Color _statusColor() {
+    if (room == null) {
+      return hasRoom ? AppColors.success : AppColors.warning;
+    }
+    switch (room!.status) {
+      case AppConstants.roomMaintenance:
+        return AppColors.warning;
+      case AppConstants.roomOccupied:
+        return AppColors.success;
+      default:
+        return AppColors.info;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final roomNumber = room?.roomNumber ??
+        (hasRoom ? user?.roomNumber?.toString() ?? '' : 'Not Assigned');
+    final hostel =
+        room?.hostelName ?? (hasRoom ? user?.hostel?.toString() ?? '' : '');
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -102,40 +264,73 @@ class _RoomDetailsCard extends StatelessWidget {
                       color: AppColors.primary),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user?.roomNumber ?? 'U-204',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        roomNumber,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
-                    ),
-                    Text(
-                      user?.hostel ?? 'Unity Hall',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
+                      Text(
+                        hostel.isNotEmpty
+                            ? hostel
+                            : 'Book a room to see details',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 12),
-            _detailRow(Icons.layers_outlined, 'Floor', '2nd Floor'),
-            const SizedBox(height: 10),
-            _detailRow(Icons.single_bed_rounded, 'Bed', 'Bed A'),
-            const SizedBox(height: 10),
-            _detailRow(Icons.people_outline, 'Capacity', '2 students'),
+            _detailRow(
+              Icons.layers_outlined,
+              'Floor',
+              hasRoom ? _floorLabel() : '—',
+            ),
             const SizedBox(height: 10),
             _detailRow(
-                Icons.check_circle_outline, 'Status', 'Occupied',
-                valueColor: AppColors.success),
+              Icons.people_outline,
+              'Occupancy',
+              room != null
+                  ? '${room!.currentOccupants} / ${room!.capacity} students'
+                  : (hasRoom ? '—' : '—'),
+            ),
+            const SizedBox(height: 10),
+            _detailRow(
+              Icons.meeting_room_outlined,
+              'Room type',
+              room != null && room!.capacity > 1
+                  ? 'Shared (${room!.capacity} beds)'
+                  : 'Single',
+            ),
+            const SizedBox(height: 10),
+            _detailRow(
+              Icons.check_circle_outline,
+              'Room status',
+              _statusLabel(),
+              valueColor: _statusColor(),
+            ),
+            if (hasRoom && room == null) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Full details appear when your booking is synced from the server.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary.withOpacity(0.9),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -169,13 +364,46 @@ class _RoomDetailsCard extends StatelessWidget {
   }
 }
 
-// ── Roommate Card ─────────────────────────────────────────────────────────────
-
-class _RoommateCard extends StatelessWidget {
-  const _RoommateCard();
+class _OccupancyPlaceholderCard extends StatelessWidget {
+  const _OccupancyPlaceholderCard();
 
   @override
   Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: AppColors.info.withOpacity(0.85)),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Room occupancy and sharing details will show here when your booking is loaded from the server.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Occupancy / sharing ─────────────────────────────────────────────────────
+class _OccupancyCard extends StatelessWidget {
+  final RoomModel room;
+
+  const _OccupancyCard({required this.room});
+
+  @override
+  Widget build(BuildContext context) {
+    final others = room.currentOccupants - 1;
+    final shared = room.capacity > 1;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -183,57 +411,35 @@ class _RoommateCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Roommate',
+              'Your room',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                // Avatar
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.info.withOpacity(0.15),
-                  child: const Text(
-                    'AO',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.info,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Ama Owusu',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                    Text(
-                      'ama.owusu@ashesi.edu.gh',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    Text(
-                      'Bed B · Year 2',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            const SizedBox(height: 8),
+            Text(
+              shared
+                  ? '${room.capacity}-bed capacity · ${room.currentOccupants} assigned'
+                  : 'Single occupancy',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
+            if (shared && others > 0) ...[
+              const SizedBox(height: 6),
+              Text(
+                'You share this room with $others other student(s).',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.35,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -245,10 +451,19 @@ class _RoommateCard extends StatelessWidget {
 
 class _QRCodeCard extends StatelessWidget {
   final String roomNumber;
-  const _QRCodeCard({required this.roomNumber});
+  final String? qrCode;
+
+  const _QRCodeCard({
+    required this.roomNumber,
+    this.qrCode,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final display = (qrCode != null && qrCode!.trim().isNotEmpty)
+        ? qrCode!.trim()
+        : roomNumber;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -263,17 +478,15 @@ class _QRCodeCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               'Scan this to identify your room or share with maintenance staff',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 16),
-            // QR code placeholder — in a real app, use qr_flutter package:
-            // QrImageView(data: roomNumber, version: QrVersions.auto, size: 140)
             Container(
               width: 140,
               height: 140,
@@ -289,7 +502,7 @@ class _QRCodeCard extends StatelessWidget {
                       size: 72, color: AppColors.textPrimary),
                   const SizedBox(height: 4),
                   Text(
-                    roomNumber,
+                    display.isNotEmpty ? display : '—',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,

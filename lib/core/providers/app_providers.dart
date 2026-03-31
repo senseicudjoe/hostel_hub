@@ -82,6 +82,21 @@ final roomsProvider = StreamProvider<List<RoomModel>>((ref) {
   return ref.read(firestoreServiceProvider).getRooms();
 });
 
+final availableRoomsProvider = StreamProvider<List<RoomModel>>((ref) {
+  return ref.read(firestoreServiceProvider).getAvailableRooms();
+});
+
+/// Current student's allocated room (from active allocation → `rooms/{roomId}`).
+/// Null if unassigned or no matching Firestore data (e.g. demo user without DB).
+final myRoomProvider = StreamProvider<RoomModel?>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return const Stream.empty();
+  if (user.roomNumber.trim().isEmpty || user.hostel.trim().isEmpty) {
+    return Stream.value(null);
+  }
+  return ref.read(firestoreServiceProvider).watchStudentRoom(user.uid);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DEMO USERS (explore UI without Firebase credentials)
 // ─────────────────────────────────────────────────────────────────────────────

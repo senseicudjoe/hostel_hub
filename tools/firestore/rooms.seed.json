@@ -1,0 +1,45 @@
+{
+  "rooms": [
+    {
+      "roomId": "unity_u201",
+      "hostelName": "Unity Hall",
+      "roomNumber": "U-201",
+      "floor": 2,
+      "capacity": 2,
+      "currentOccupants": 0,
+      "status": "available",
+      "qrCode": "UNITY-U-201"
+    },
+    {
+      "roomId": "unity_u202",
+      "hostelName": "Unity Hall",
+      "roomNumber": "U-202",
+      "floor": 2,
+      "capacity": 2,
+      "currentOccupants": 1,
+      "status": "available",
+      "qrCode": "UNITY-U-202"
+    },
+    {
+      "roomId": "freedom_f101",
+      "hostelName": "Freedom Hall",
+      "roomNumber": "F-101",
+      "floor": 1,
+      "capacity": 2,
+      "currentOccupants": 2,
+      "status": "occupied",
+      "qrCode": "FREEDOM-F-101"
+    },
+    {
+      "roomId": "independence_i305",
+      "hostelName": "Independence Hall",
+      "roomNumber": "I-305",
+      "floor": 3,
+      "capacity": 4,
+      "currentOccupants": 0,
+      "status": "maintenance",
+      "qrCode": "INDEPENDENCE-I-305"
+    }
+  ]
+}
+
