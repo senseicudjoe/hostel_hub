@@ -8,7 +8,114 @@ import '../../../core/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sign up — creates Firebase Auth user + Firestore `users/{uid}` profile.
-// Admin accounts are not self-service; use Demo Admin or SLE provisioning.
+// Admin accounts are not self-service; use SLE provisioning.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Role selector widget ──────────────────────────────────────────────────────
+
+class _RoleSelector extends StatelessWidget {
+  final String selectedRole;
+  final ValueChanged<String> onChanged;
+
+  const _RoleSelector({
+    required this.selectedRole,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'I am a',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _RoleOption(
+              icon: Icons.school_rounded,
+              label: 'Student',
+              value: AppConstants.roleStudent,
+              isSelected: selectedRole == AppConstants.roleStudent,
+              onTap: () => onChanged(AppConstants.roleStudent),
+            ),
+            const SizedBox(width: 12),
+            _RoleOption(
+              icon: Icons.work_outline_rounded,
+              label: 'Staff',
+              value: AppConstants.roleStaff,
+              isSelected: selectedRole == AppConstants.roleStaff,
+              onTap: () => onChanged(AppConstants.roleStaff),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _RoleOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _RoleOption({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : AppColors.input,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.divider,
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -167,25 +274,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 14),
-                    DropdownButtonFormField<String>(
-                      value: _role,
-                      decoration: const InputDecoration(
-                        labelText: 'I am a',
-                        prefixIcon: Icon(Icons.group_outlined),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: AppConstants.roleStudent,
-                          child: Text('Student'),
-                        ),
-                        DropdownMenuItem(
-                          value: AppConstants.roleStaff,
-                          child: Text('Staff'),
-                        ),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setState(() => _role = v);
-                      },
+                    _RoleSelector(
+                      selectedRole: _role,
+                      onChanged: (v) => setState(() => _role = v),
                     ),
                     const SizedBox(height: 14),
                     TextFormField(

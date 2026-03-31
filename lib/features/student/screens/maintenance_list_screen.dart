@@ -55,38 +55,47 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Maintenance'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'All'),
-            Tab(text: 'Pending'),
-            Tab(text: 'In Progress'),
-            Tab(text: 'Resolved'),
-          ],
-        ),
       ),
-      body: async.when(
-        data: (requests) {
-          return TabBarView(
-            controller: _tabController,
-            children: List.generate(4, (i) {
-              final filtered = _filter(requests, i);
-              return _RequestList(requests: filtered);
-            }),
-          );
-        },
-        loading: () =>
-            const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Could not load requests.\n$e',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary),
+      body: Column(
+        children: [
+          // White tab bar strip — sits below the red AppBar
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'All'),
+                Tab(text: 'Pending'),
+                Tab(text: 'In Progress'),
+                Tab(text: 'Resolved'),
+              ],
             ),
           ),
-        ),
+          // Content area
+          Expanded(
+            child: async.when(
+              data: (requests) => TabBarView(
+                controller: _tabController,
+                children: List.generate(4, (i) {
+                  final filtered = _filter(requests, i);
+                  return _RequestList(requests: filtered);
+                }),
+              ),
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Could not load requests.\n$e',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.go('/maintenance/new'),

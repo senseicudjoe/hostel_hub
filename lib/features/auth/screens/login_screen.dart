@@ -76,13 +76,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  // ── Demo mode shortcuts ───────────────────────────────────────────────────
-  void _loginAsDemo(bool asAdmin) {
-    final user = asAdmin ? DemoUsers.admin : DemoUsers.student;
-    ref.read(currentUserProvider.notifier).state = user;
-    context.go(asAdmin ? '/admin' : '/home');
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -305,64 +298,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 label: const Text('Use Biometrics'),
               ),
 
-              const SizedBox(height: 32),
-
-              // ── Demo Mode ─────────────────────────────────────
-              // This section lets you explore all screens without Firebase.
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: AppColors.primary.withOpacity(0.2)),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.preview_rounded,
-                            size: 18, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Demo Mode — explore without an account',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(44),
-                            ),
-                            onPressed: () => _loginAsDemo(false),
-                            child: const Text('Demo Student'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(44),
-                            ),
-                            onPressed: () => _loginAsDemo(true),
-                            child: const Text('Demo Admin'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
             ],
           ),
         ),
