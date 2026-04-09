@@ -58,9 +58,9 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
       ),
       body: Column(
         children: [
-          // White tab bar strip — sits below the red AppBar
+          // Tab bar strip — sits below the AppBar
           Container(
-            color: Colors.white,
+            color: AppColors.cardOf(context),
             child: TabBar(
               controller: _tabController,
               tabs: const [
@@ -89,7 +89,7 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
                   child: Text(
                     'Could not load requests.\n$e',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: AppColors.textMutedOf(context)),
                   ),
                 ),
               ),
@@ -113,15 +113,15 @@ class _RequestList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (requests.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox_outlined, size: 56, color: AppColors.textHint),
-            SizedBox(height: 12),
+            const Icon(Icons.inbox_outlined, size: 56, color: AppColors.textHint),
+            const SizedBox(height: 12),
             Text(
               'No requests here',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
+              style: TextStyle(color: AppColors.textMutedOf(context), fontSize: 15),
             ),
           ],
         ),
@@ -178,10 +178,10 @@ class _RequestCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             request.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
-                              color: AppColors.textPrimary,
+                              color: AppColors.textOf(context),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -194,9 +194,9 @@ class _RequestCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       request.description,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: AppColors.textMutedOf(context),
                         height: 1.4,
                       ),
                       maxLines: 2,
@@ -205,25 +205,25 @@ class _RequestCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.meeting_room_outlined,
-                            size: 13, color: AppColors.textSecondary),
+                        Icon(Icons.meeting_room_outlined,
+                            size: 13, color: AppColors.textMutedOf(context)),
                         const SizedBox(width: 4),
                         Text(
                           roomLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: AppColors.textMutedOf(context),
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Icon(Icons.calendar_today_outlined,
-                            size: 13, color: AppColors.textSecondary),
+                        Icon(Icons.calendar_today_outlined,
+                            size: 13, color: AppColors.textMutedOf(context)),
                         const SizedBox(width: 4),
                         Text(
                           dateStr,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: AppColors.textMutedOf(context),
                           ),
                         ),
                       ],

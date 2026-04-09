@@ -37,7 +37,6 @@ class _StudentDashboardScreenState
     final dateStr = DateFormat('EEEE, d MMMM').format(now);
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
       body: CustomScrollView(
         slivers: [
           // ── Collapsing AppBar ──────────────────────────────
@@ -116,12 +115,12 @@ class _StudentDashboardScreenState
                 const SizedBox(height: 20),
 
                 // ── Quick Actions ────────────────────────────
-                const Text(
+                Text(
                   'Quick Actions',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: AppColors.textOf(context),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -133,12 +132,12 @@ class _StudentDashboardScreenState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Announcements',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: AppColors.textOf(context),
                       ),
                     ),
                     TextButton(
@@ -151,11 +150,11 @@ class _StudentDashboardScreenState
                 announcementsAsync.when(
                   data: (list) {
                     if (list.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Text(
                           'No announcements yet.',
-                          style: TextStyle(color: AppColors.textSecondary),
+                          style: TextStyle(color: AppColors.textMutedOf(context)),
                         ),
                       );
                     }
@@ -322,12 +321,10 @@ class _QuickActionGrid extends StatelessWidget {
           onTap: () => context.go('/explore'),
         ),
         _QuickActionTile(
-          icon: Icons.qr_code_scanner_rounded,
-          label: 'Scan\nQR',
+          icon: Icons.hotel_rounded,
+          label: 'My\nRoom',
           color: const Color(0xFF2E7D32),
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('QR Scanner — open camera')),
-          ),
+          onTap: () => context.go('/room'),
         ),
         _QuickActionTile(
           icon: Icons.campaign_rounded,
@@ -414,9 +411,9 @@ class _AnnouncementTicker extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textPrimary,
+                  color: AppColors.textOf(context),
                   fontWeight: FontWeight.w500,
                 ),
                 maxLines: 1,
@@ -490,9 +487,9 @@ class _AnnouncementPreviewCard extends StatelessWidget {
                       ),
                       Text(
                         date,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textSecondary,
+                          color: AppColors.textMutedOf(context),
                         ),
                       ),
                     ],
@@ -500,9 +497,9 @@ class _AnnouncementPreviewCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     body,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textSecondary,
+                      color: AppColors.textMutedOf(context),
                       height: 1.4,
                     ),
                     maxLines: 2,

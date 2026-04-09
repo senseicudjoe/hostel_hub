@@ -24,7 +24,6 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
     final roomsAsync = ref.watch(roomsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
       appBar: AppBar(
         title: const Text('Explore Rooms'),
         actions: [
@@ -210,8 +209,8 @@ class _FiltersBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: AppColors.divider)),
+        color: AppColors.cardOf(context),
+        border: Border(bottom: BorderSide(color: AppColors.dividerOf(context))),
       ),
       child: Row(
         children: [
@@ -228,18 +227,18 @@ class _FiltersBar extends StatelessWidget {
               onChanged: (v) => onHostelChanged(v ?? 'All'),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Bookable only',
+              Text(
+                'Available',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textMutedOf(context),
                 ),
               ),
-              const SizedBox(width: 6),
               Switch(
                 value: bookableOnly,
                 onChanged: onBookableOnlyChanged,
@@ -303,17 +302,17 @@ class _RoomCard extends StatelessWidget {
                     children: [
                       Text(
                         room.roomNumber,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+                          color: AppColors.textOf(context),
                         ),
                       ),
                       Text(
                         room.hostelName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.textSecondary,
+                          color: AppColors.textMutedOf(context),
                         ),
                       ),
                     ],
@@ -381,20 +380,20 @@ class _InfoPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.input,
+        color: AppColors.inputOf(context),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: AppColors.dividerOf(context)),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: AppColors.textSecondary),
+          Icon(icon, size: 16, color: AppColors.textMutedOf(context)),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
+              color: AppColors.textMutedOf(context),
             ),
           ),
         ],
@@ -428,19 +427,19 @@ class _EmptyRooms extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'No rooms found',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+                color: AppColors.textOf(context),
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Try changing the hostel filter or showing all rooms.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: AppColors.textMutedOf(context)),
             ),
           ],
         ),

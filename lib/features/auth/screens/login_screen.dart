@@ -76,10 +76,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _forgotPassword(BuildContext context) async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your email above first.')),
+      );
+      return;
+    }
+    try {
+      await ref.read(authServiceProvider).resetPassword(email);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password reset email sent. Check your inbox.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -104,23 +130,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Welcome back',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
+                  color: AppColors.textOf(context),
                   letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Sign in to your HostelHub account',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textMutedOf(context),
                 ),
               ),
 
@@ -220,7 +246,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           child: const Text('Create account'),
                         ),
                         TextButton(
-                          onPressed: () {},
+                          onPressed: () => _forgotPassword(context),
                           child: const Text('Forgot password?'),
                         ),
                       ],
@@ -258,7 +284,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       'or continue with',
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textSecondary.withOpacity(0.8),
+                        color: AppColors.textMutedOf(context).withValues(alpha: 0.8),
                       ),
                     ),
                   ),

@@ -30,6 +30,11 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/home'),
+        ),
         title: Row(
           children: [
             const Text('Announcements'),
@@ -64,10 +69,10 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
       body: async.when(
         data: (list) {
           if (list.isEmpty) {
-            return const Center(
+            return Center(
               child: Text(
                 'No announcements yet.',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: AppColors.textMutedOf(context)),
               ),
             );
           }
@@ -161,10 +166,10 @@ class _AnnouncementCard extends StatelessWidget {
                       children: [
                         Text(
                           a.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
-                            color: AppColors.textPrimary,
+                            color: AppColors.textOf(context),
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -174,22 +179,22 @@ class _AnnouncementCard extends StatelessWidget {
                           children: [
                             Text(
                               a.sentBy,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
-                                color: AppColors.textSecondary,
+                                color: AppColors.textMutedOf(context),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const Text(
+                            Text(
                               ' · ',
                               style: TextStyle(
-                                  color: AppColors.textHint, fontSize: 11),
+                                  color: AppColors.textMutedOf(context), fontSize: 11),
                             ),
                             Text(
                               dateStr,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
-                                color: AppColors.textSecondary,
+                                color: AppColors.textMutedOf(context),
                               ),
                             ),
                           ],
@@ -201,7 +206,7 @@ class _AnnouncementCard extends StatelessWidget {
                     isExpanded
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
-                    color: AppColors.textSecondary,
+                    color: AppColors.textMutedOf(context),
                   ),
                 ],
               ),
@@ -211,9 +216,9 @@ class _AnnouncementCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   a.body,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: AppColors.textMutedOf(context),
                     height: 1.6,
                   ),
                 ),
@@ -222,21 +227,21 @@ class _AnnouncementCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.input,
+                    color: AppColors.inputOf(context),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.group_outlined,
-                          size: 13, color: AppColors.textSecondary),
+                      Icon(Icons.group_outlined,
+                          size: 13, color: AppColors.textMutedOf(context)),
                       const SizedBox(width: 4),
                       Text(
                         a.targetRole,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
+                          color: AppColors.textMutedOf(context),
                         ),
                       ),
                     ],
