@@ -196,6 +196,23 @@ class FirestoreService {
     await batch.commit();
   }
 
+  // ── ROOMMATES ─────────────────────────────────────────────
+
+  /// Returns all students in the same hostel + room, excluding the requesting user.
+  Stream<List<UserModel>> getRoommates(
+      String hostel, String roomNumber, String excludeUid) {
+    return _db
+        .collection(AppConstants.usersCollection)
+        .where('hostel', isEqualTo: hostel)
+        .where('roomNumber', isEqualTo: roomNumber)
+        .where('role', isEqualTo: AppConstants.roleStudent)
+        .snapshots()
+        .map((s) => s.docs
+            .map((d) => UserModel.fromMap(d.data()))
+            .where((u) => u.uid != excludeUid)
+            .toList());
+  }
+
   // ── MAINTENANCE REQUESTS ──────────────────────────────────
 
   Future<String> submitMaintenanceRequest(MaintenanceRequest request) async {

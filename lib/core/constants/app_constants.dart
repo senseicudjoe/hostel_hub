@@ -32,6 +32,7 @@ class AppConstants {
   // Hive box names
   static const String pendingRequestsBox = 'pending_requests';
   static const String cacheBox           = 'cache';
+  static const String settingsBox        = 'settings'; // dark mode, biometric prefs
 
   // Storage paths
   static const String profileImagesPath     = 'profile_images';

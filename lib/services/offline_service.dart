@@ -6,6 +6,7 @@ class OfflineService {
   static Future<void> init() async {
     await Hive.openBox(AppConstants.pendingRequestsBox);
     await Hive.openBox(AppConstants.cacheBox);
+    await Hive.openBox(AppConstants.settingsBox);
   }
 
   // ── Pending Maintenance Requests ──────────────────────────

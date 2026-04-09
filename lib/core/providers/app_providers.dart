@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../models/announcement.dart';
 import '../../models/maintenance_request.dart';
@@ -26,8 +28,7 @@ final offlineServiceProvider =
     Provider<OfflineService>((_) => OfflineService());
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SESSION USER (single source of truth for UI + navigation)
-// Set by login / demo; hydrated on cold start if Firebase has a session.
+// SESSION USER
 // ─────────────────────────────────────────────────────────────────────────────
 
 final currentUserProvider = StateProvider<UserModel?>((ref) => null);
@@ -42,7 +43,7 @@ final isAdminProvider = Provider<bool>((ref) {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FIREBASE AUTH (for session hydration; demo users do not use Firebase Auth)
+// FIREBASE AUTH STREAM
 // ─────────────────────────────────────────────────────────────────────────────
 
 final firebaseAuthUserProvider = StreamProvider<User?>((ref) {
@@ -50,7 +51,66 @@ final firebaseAuthUserProvider = StreamProvider<User?>((ref) {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DATA — all streams respect logged-in user where applicable
+// THEME MODE — persisted in Hive settingsBox
+// ─────────────────────────────────────────────────────────────────────────────
+
+class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  ThemeModeNotifier() : super(_loadFromHive());
+
+  static ThemeMode _loadFromHive() {
+    try {
+      final box = Hive.box(AppConstants.settingsBox);
+      final isDark = box.get('darkMode', defaultValue: false) as bool;
+      return isDark ? ThemeMode.dark : ThemeMode.light;
+    } catch (_) {
+      return ThemeMode.light;
+    }
+  }
+
+  void setDarkMode(bool isDark) {
+    state = isDark ? ThemeMode.dark : ThemeMode.light;
+    try {
+      Hive.box(AppConstants.settingsBox).put('darkMode', isDark);
+    } catch (_) {}
+  }
+}
+
+final themeModeProvider =
+    StateNotifierProvider<ThemeModeNotifier, ThemeMode>(
+  (_) => ThemeModeNotifier(),
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BIOMETRIC PREFERENCE — persisted in Hive settingsBox
+// ─────────────────────────────────────────────────────────────────────────────
+
+class BiometricNotifier extends StateNotifier<bool> {
+  BiometricNotifier() : super(_load());
+
+  static bool _load() {
+    try {
+      return Hive.box(AppConstants.settingsBox)
+          .get('biometricEnabled', defaultValue: false) as bool;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void setEnabled(bool enabled) {
+    state = enabled;
+    try {
+      Hive.box(AppConstants.settingsBox).put('biometricEnabled', enabled);
+    } catch (_) {}
+  }
+}
+
+final biometricEnabledProvider =
+    StateNotifierProvider<BiometricNotifier, bool>(
+  (_) => BiometricNotifier(),
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA STREAMS
 // ─────────────────────────────────────────────────────────────────────────────
 
 final studentMaintenanceRequestsProvider =
@@ -67,7 +127,6 @@ final allMaintenanceRequestsProvider =
   return ref.read(firestoreServiceProvider).getAllMaintenanceRequests();
 });
 
-/// Single maintenance request by id (detail screen).
 final maintenanceRequestProvider =
     StreamProvider.family<MaintenanceRequest?, String>((ref, requestId) {
   return ref.read(firestoreServiceProvider).watchMaintenanceRequest(requestId);
@@ -86,8 +145,6 @@ final availableRoomsProvider = StreamProvider<List<RoomModel>>((ref) {
   return ref.read(firestoreServiceProvider).getAvailableRooms();
 });
 
-/// Current student's allocated room (from active allocation → `rooms/{roomId}`).
-/// Null if unassigned or no matching Firestore data (e.g. demo user without DB).
 final myRoomProvider = StreamProvider<RoomModel?>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return const Stream.empty();
@@ -97,8 +154,21 @@ final myRoomProvider = StreamProvider<RoomModel?>((ref) {
   return ref.read(firestoreServiceProvider).watchStudentRoom(user.uid);
 });
 
+/// Other students sharing the same room as the current user.
+final roommatesProvider = StreamProvider<List<UserModel>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null ||
+      user.hostel.trim().isEmpty ||
+      user.roomNumber.trim().isEmpty) {
+    return Stream.value([]);
+  }
+  return ref
+      .read(firestoreServiceProvider)
+      .getRoommates(user.hostel, user.roomNumber, user.uid);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
-// DEMO USERS (explore UI without Firebase credentials)
+// DEMO USERS
 // ─────────────────────────────────────────────────────────────────────────────
 
 class DemoUsers {
