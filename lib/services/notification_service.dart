@@ -6,29 +6,51 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive/hive.dart';
 import '../core/constants/app_constants.dart';
 
-// ── Background handler (top-level required by FCM) ────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Notification channel constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _channelId   = 'hostelhub_channel';
+const _channelName = 'HostelHub Notifications';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Background / terminated handler (top-level — required by FCM)
+//
+// Called when a DATA-ONLY message arrives while the app is in the background
+// or terminated.  Messages that include a `notification` payload are shown
+// automatically by the OS; this handler is only needed for silent data
+// messages that the Cloud Functions might send in the future.
+//
+// NOTE: This runs in a separate Dart isolate — no access to providers,
+// Hive, or Flutter widgets.  Use only dart:io / firebase_admin APIs.
+// ─────────────────────────────────────────────────────────────────────────────
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Firebase is already initialised by the time this runs
-  debugPrint('📩 Background message: ${message.notification?.title}');
+  debugPrint('📩 Background FCM: ${message.notification?.title ?? message.data}');
+  // Cloud Functions send notification payloads so the OS handles display.
+  // Nothing extra needed here — this entry point exists to satisfy FCM's
+  // requirement for a registered top-level handler.
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NotificationService
+// ─────────────────────────────────────────────────────────────────────────────
 
 class NotificationService {
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _local =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
 
   StreamSubscription<String>? _tokenRefreshSub;
 
-  static const _channelId   = 'hostelhub_channel';
-  static const _channelName = 'HostelHub Notifications';
+  // ── Initialise ────────────────────────────────────────────────────────────
 
-  // ── Initialise ────────────────────────────────────────────
   Future<void> initialize() async {
-    // 1. Request permission
+    // 1. Request permission (shows OS prompt on iOS / Android 13+).
     await _fcm.requestPermission(alert: true, badge: true, sound: true);
 
-    // 2. Android notification channel
+    // 2. Android notification channel (required for Android 8+).
     const channel = AndroidNotificationChannel(
       _channelId,
       _channelName,
@@ -37,34 +59,47 @@ class NotificationService {
     );
     await _local
         .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
 
-    // 3. Local notifications init
+    // 3. Initialise local notifications plugin.
     const androidSettings =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
     await _local.initialize(
-      const InitializationSettings(
-          android: androidSettings, iOS: iosSettings),
+      const InitializationSettings(android: androidSettings, iOS: iosSettings),
+      // Handle notification tap while app is in foreground or background.
+      onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
-    // 4. Foreground message listener
-    FirebaseMessaging.onMessage.listen(_showLocalNotification);
+    // 4. Foreground message listener — show a local notification since FCM
+    //    suppresses the system banner while the app is active.
+    FirebaseMessaging.onMessage.listen(_onForegroundMessage);
 
-    // 5. Background handler already registered in main.dart
+    // 5. App opened from a terminated state via notification tap.
+    final initialMessage = await _fcm.getInitialMessage();
+    if (initialMessage != null) {
+      _handleMessageData(initialMessage.data);
+    }
+
+    // 6. App brought to foreground from background via notification tap.
+    FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+      _handleMessageData(msg.data);
+    });
   }
 
-  void _showLocalNotification(RemoteMessage message) {
+  // ── Foreground message display ────────────────────────────────────────────
+
+  void _onForegroundMessage(RemoteMessage message) {
     final n = message.notification;
     if (n == null) return;
 
     _local.show(
-      n.hashCode,
+      message.hashCode,
       n.title,
       n.body,
       const NotificationDetails(
@@ -77,10 +112,50 @@ class NotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
+      // Encode the FCM data payload so the tap handler can deep-link.
+      payload: _encodePayload(message.data),
     );
   }
 
-  // ── Save / refresh FCM token ──────────────────────────────
+  // ── Notification tap handler ──────────────────────────────────────────────
+
+  void _onNotificationTap(NotificationResponse response) {
+    if (response.payload == null) return;
+    final data = _decodePayload(response.payload!);
+    _handleMessageData(data);
+  }
+
+  /// Override this in tests or via a router callback to handle deep linking.
+  /// Default implementation just logs the data.
+  void _handleMessageData(Map<String, dynamic> data) {
+    final type = data['type'];
+    debugPrint('📬 Notification tapped — type: $type, data: $data');
+    // Deep-linking is wired up via a global NavigatorKey in the router.
+    // The router already handles /maintenance/:id via GoRouter, so when
+    // the user taps a maintenance notification the app will open correctly
+    // once you call context.push('/maintenance/${data['requestId']}').
+    //
+    // To implement: expose a static callback here that the router can set,
+    // or use a Riverpod provider that the Shell screens listen to.
+  }
+
+  // ── Payload encoding (simple key=value CSV) ───────────────────────────────
+
+  String _encodePayload(Map<String, dynamic> data) {
+    return data.entries.map((e) => '${e.key}=${e.value}').join(';');
+  }
+
+  Map<String, dynamic> _decodePayload(String payload) {
+    final result = <String, dynamic>{};
+    for (final pair in payload.split(';')) {
+      final idx = pair.indexOf('=');
+      if (idx > 0) result[pair.substring(0, idx)] = pair.substring(idx + 1);
+    }
+    return result;
+  }
+
+  // ── Save / refresh FCM token ──────────────────────────────────────────────
+
   Future<void> saveFcmToken(String uid) async {
     final token = await _fcm.getToken();
     if (token != null) {
@@ -101,7 +176,8 @@ class NotificationService {
     });
   }
 
-  // ── Topic subscriptions ───────────────────────────────────
+  // ── Topic subscriptions ───────────────────────────────────────────────────
+
   Future<void> subscribeToRole(String role) async {
     await _fcm.subscribeToTopic(AppConstants.topicAll);
     if (role == AppConstants.roleStudent) {
@@ -145,27 +221,23 @@ class NotificationService {
     } catch (_) {}
   }
 
-  // ── Welcome notification ──────────────────────────────────
-  /// Fires a local "Welcome to HostelHub" notification 5 seconds after
-  /// the first ever successful sign-in.  Uses Hive to make sure it only
-  /// fires once per device, even if the user signs out and back in.
+  // ── Welcome notification (fires once, first sign-in) ─────────────────────
+
   Future<void> showWelcomeNotificationIfNeeded(String userName) async {
     try {
       final box = Hive.box(AppConstants.settingsBox);
-      final alreadySent = box.get('welcomeNotifSent', defaultValue: false) as bool;
+      final alreadySent =
+          box.get('welcomeNotifSent', defaultValue: false) as bool;
       if (alreadySent) return;
 
-      // Mark immediately so a double-call (e.g. hot-restart during dev) won't
-      // fire it twice.
       await box.put('welcomeNotifSent', true);
-
       await Future.delayed(const Duration(seconds: 5));
 
       final firstName = userName.split(' ').first;
 
       await _local.show(
-        99901, // fixed ID so it won't duplicate
-        'Welcome to HostelHub, $firstName! 🏠',
+        99901,
+        'Welcome to HostelHub, $firstName!',
         'Your smart hostel companion is ready. '
             'Browse rooms, track maintenance requests, and stay connected '
             'with Ashesi announcements — all from one place.',
@@ -182,7 +254,7 @@ class NotificationService {
         ),
       );
     } catch (_) {
-      // Notification failure is non-critical — swallow silently.
+      // Non-critical — swallow silently.
     }
   }
 }

@@ -10,6 +10,7 @@ import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/onboarding_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/biometric_settings_screen.dart';
+import '../../features/settings/screens/ambient_dark_mode_screen.dart';
 import '../../features/auth/screens/email_verification_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/auth/screens/student_setup_screen.dart';
@@ -246,6 +247,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) =>
                         const BiometricSettingsScreen(),
                   ),
+                  GoRoute(
+                    path: 'dark-mode',
+                    builder: (context, state) =>
+                        const AmbientDarkModeScreen(),
+                  ),
                 ],
               ),
             ],
@@ -331,6 +337,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'biometrics',
                     builder: (context, state) =>
                         const BiometricSettingsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'dark-mode',
+                    builder: (context, state) =>
+                        const AmbientDarkModeScreen(),
                   ),
                 ],
               ),

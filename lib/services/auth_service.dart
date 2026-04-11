@@ -73,6 +73,36 @@ class AuthService {
     return null;
   }
 
+  // ── Google Sign-In (silent — used for biometric login) ──────────────────
+  /// Tries a silent sign-in first (no UI). Falls back to the account picker
+  /// only if the Google session has expired.  Used when the user has already
+  /// passed the device biometric prompt and we just need to restore the
+  /// Firebase session.
+  Future<UserModel?> signInWithGoogleSilent() async {
+    try {
+      final googleSignIn = GoogleSignIn();
+      GoogleSignInAccount? googleUser = await googleSignIn.signInSilently();
+      googleUser ??= await googleSignIn.signIn(); // fallback if token expired
+      if (googleUser == null) return null;
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      final doc = await _db
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .get();
+      if (doc.exists) return UserModel.fromMap(doc.data()!);
+      return null;
+    } on FirebaseAuthException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // ── Google Sign-In ───────────────────────────────────────
   Future<UserModel?> signInWithGoogle() async {
     try {

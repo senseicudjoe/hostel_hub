@@ -21,16 +21,14 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _maintenanceNotifs = true;
-  bool _announcementNotifs = true;
-
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final isAdmin = ref.watch(isAdminProvider);
-    final themeMode = ref.watch(themeModeProvider);
+    final notifPrefs = ref.watch(notificationPrefsProvider);
     final biometricEnabled = ref.watch(biometricEnabledProvider);
-    final isDark = themeMode == ThemeMode.dark;
+    final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
+    final config = ref.read(themeModeProvider.notifier).config;
 
     final initials =
         user?.name
@@ -72,9 +70,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   icon: Icons.build_outlined,
                   title: 'Maintenance Updates',
                   subtitle: 'Get notified when your request status changes',
-                  value: _maintenanceNotifs,
+                  value: notifPrefs.maintenanceNotifs,
                   onChanged: (v) {
-                    setState(() => _maintenanceNotifs = v);
+                    ref
+                        .read(notificationPrefsProvider.notifier)
+                        .setMaintenanceNotifs(v);
                     final ns = ref.read(notificationServiceProvider);
                     if (v) {
                       ns.subscribeToRole(ref.read(userRoleProvider));
@@ -88,8 +88,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   icon: Icons.campaign_outlined,
                   title: 'Announcements',
                   subtitle: 'Important notices from SLE',
-                  value: _announcementNotifs,
-                  onChanged: (v) => setState(() => _announcementNotifs = v),
+                  value: notifPrefs.announcementNotifs,
+                  onChanged: (v) {
+                    ref
+                        .read(notificationPrefsProvider.notifier)
+                        .setAnnouncementNotifs(v);
+                    final ns = ref.read(notificationServiceProvider);
+                    if (v) {
+                      ns.subscribeToRole(ref.read(userRoleProvider));
+                    } else {
+                      ns.unsubscribeAll();
+                    }
+                  },
                 ),
               ],
             ),
@@ -100,13 +110,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             _SectionHeader(title: 'Preferences'),
             _SettingsCard(
               children: [
-                _ToggleTile(
-                  icon: Icons.dark_mode_outlined,
+                _ActionTile(
+                  icon: isDark
+                      ? Icons.dark_mode_rounded
+                      : Icons.light_mode_outlined,
                   title: 'Dark Mode',
-                  subtitle: 'Use dark theme throughout the app',
-                  value: isDark,
-                  onChanged: (v) =>
-                      ref.read(themeModeProvider.notifier).setDarkMode(v),
+                  subtitle: _darkModeSubtitle(config, isDark),
+                  trailing: Text(
+                    _darkModeLabel(config.strategy),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  onTap: () => context.push(
+                    isAdmin
+                        ? '/admin/profile/dark-mode'
+                        : '/profile/dark-mode',
+                  ),
                 ),
                 const Divider(height: 1),
                 _ActionTile(
@@ -183,6 +205,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  // ── Dark mode helpers ───────────────────────────────────────────────────────
+
+  String _darkModeLabel(DarkModeStrategy strategy) => switch (strategy) {
+        DarkModeStrategy.manual => 'Manual',
+        DarkModeStrategy.scheduled => 'Scheduled',
+        DarkModeStrategy.sensor => 'Sensor',
+      };
+
+  String _darkModeSubtitle(DarkModeConfig config, bool isDark) {
+    return switch (config.strategy) {
+      DarkModeStrategy.manual =>
+        isDark ? 'Dark theme active' : 'Light theme active',
+      DarkModeStrategy.scheduled =>
+        'Auto between ${_fmt(config.scheduleStartHour, config.scheduleStartMinute)}'
+            ' – ${_fmt(config.scheduleEndHour, config.scheduleEndMinute)}',
+      DarkModeStrategy.sensor =>
+        'Threshold: ${config.luxThreshold.round()} lux',
+    };
+  }
+
+  String _fmt(int h, int m) {
+    final period = h < 12 ? 'AM' : 'PM';
+    final hour = h % 12 == 0 ? 12 : h % 12;
+    return '$hour:${m.toString().padLeft(2, '0')} $period';
   }
 
   // ── Edit Profile sheet ──────────────────────────────────────────────────────
