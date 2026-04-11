@@ -15,6 +15,7 @@ class ExploreRoomsScreen extends ConsumerStatefulWidget {
 
 class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
   String _hostelFilter = 'All';
+
   /// When true, list only rooms that can be booked (`RoomModel.isAvailable`).
   bool _bookableOnly = false;
 
@@ -46,24 +47,24 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
           final hostelNames = rooms.map((r) => r.hostelName).toSet().toList()
             ..sort();
           final hostelOptions = <String>['All', ...hostelNames];
-          final effectiveHostel = _hostelFilter == 'All' ||
-                  hostelNames.contains(_hostelFilter)
+          final effectiveHostel =
+              _hostelFilter == 'All' || hostelNames.contains(_hostelFilter)
               ? _hostelFilter
               : 'All';
 
-          final filtered = rooms.where((r) {
-            if (_bookableOnly && !r.isAvailable) return false;
-            if (effectiveHostel != 'All' &&
-                r.hostelName != effectiveHostel) {
-              return false;
-            }
-            return true;
-          }).toList()
-            ..sort((a, b) {
-              final h = a.hostelName.compareTo(b.hostelName);
-              if (h != 0) return h;
-              return a.roomNumber.compareTo(b.roomNumber);
-            });
+          final filtered =
+              rooms.where((r) {
+                if (_bookableOnly && !r.isAvailable) return false;
+                if (effectiveHostel != 'All' &&
+                    r.hostelName != effectiveHostel) {
+                  return false;
+                }
+                return true;
+              }).toList()..sort((a, b) {
+                final h = a.hostelName.compareTo(b.hostelName);
+                if (h != 0) return h;
+                return a.roomNumber.compareTo(b.roomNumber);
+              });
 
           return Column(
             children: [
@@ -72,8 +73,7 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
                 hostelOptions: hostelOptions,
                 bookableOnly: _bookableOnly,
                 onHostelChanged: (v) => setState(() => _hostelFilter = v),
-                onBookableOnlyChanged: (v) =>
-                    setState(() => _bookableOnly = v),
+                onBookableOnlyChanged: (v) => setState(() => _bookableOnly = v),
               ),
               Expanded(
                 child: filtered.isEmpty
@@ -81,13 +81,19 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
                     : ListView.separated(
                         padding: const EdgeInsets.all(16),
                         itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final room = filtered[index];
+                          final isCurrentRoom =
+                              user != null &&
+                              user.hostel.trim() == room.hostelName &&
+                              user.roomNumber.trim() == room.roomNumber;
                           return _RoomCard(
                             room: room,
                             canBook: user?.role == AppConstants.roleStudent,
-                            onBook: user == null
+                            isCurrentRoom: isCurrentRoom,
+                            onBook: user == null || isCurrentRoom
                                 ? null
                                 : () => _confirmAndBook(context, room),
                           );
@@ -141,9 +147,7 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
     if (confirm != true || !mounted) return;
 
     messenger.clearSnackBars();
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Booking room...')),
-    );
+    messenger.showSnackBar(const SnackBar(content: Text('Booking room...')));
 
     try {
       final fs = ref.read(firestoreServiceProvider);
@@ -182,9 +186,7 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
     } catch (e) {
       if (!mounted) return;
       messenger.clearSnackBars();
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not book: $e')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('Could not book: $e')));
     }
   }
 }
@@ -216,7 +218,7 @@ class _FiltersBar extends StatelessWidget {
         children: [
           Expanded(
             child: DropdownButtonFormField<String>(
-              value: hostelFilter,
+              initialValue: hostelFilter,
               decoration: const InputDecoration(
                 labelText: 'Hostel',
                 isDense: true,
@@ -239,10 +241,7 @@ class _FiltersBar extends StatelessWidget {
                   color: AppColors.textMutedOf(context),
                 ),
               ),
-              Switch(
-                value: bookableOnly,
-                onChanged: onBookableOnlyChanged,
-              ),
+              Switch(value: bookableOnly, onChanged: onBookableOnlyChanged),
             ],
           ),
         ],
@@ -254,11 +253,13 @@ class _FiltersBar extends StatelessWidget {
 class _RoomCard extends StatelessWidget {
   final RoomModel room;
   final bool canBook;
+  final bool isCurrentRoom;
   final VoidCallback? onBook;
 
   const _RoomCard({
     required this.room,
     required this.canBook,
+    required this.isCurrentRoom,
     required this.onBook,
   });
 
@@ -270,8 +271,7 @@ class _RoomCard extends StatelessWidget {
       availability = 'Maintenance';
       statusColor = AppColors.warning;
     } else if (room.isAvailable) {
-      availability =
-          '${room.capacity - room.currentOccupants} spot(s) left';
+      availability = '${room.capacity - room.currentOccupants} spot(s) left';
       statusColor = AppColors.success;
     } else {
       availability = 'Occupied / full';
@@ -292,8 +292,10 @@ class _RoomCard extends StatelessWidget {
                     color: AppColors.primaryLight,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.meeting_room_rounded,
-                      color: AppColors.primary),
+                  child: const Icon(
+                    Icons.meeting_room_rounded,
+                    color: AppColors.primary,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -319,10 +321,12 @@ class _RoomCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.12),
+                    color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
@@ -351,14 +355,22 @@ class _RoomCard extends StatelessWidget {
                 const Spacer(),
                 if (canBook)
                   ElevatedButton(
-                    onPressed: room.isAvailable ? onBook : null,
+                    onPressed: room.isAvailable && !isCurrentRoom
+                        ? onBook
+                        : null,
                     // Override the global Size.fromHeight(52) theme (= Size(∞, 52))
                     // which causes infinite-width layout inside a Row → blank card.
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(88, 40),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
-                    child: Text(room.isAvailable ? 'Book' : 'Unavailable'),
+                    child: Text(
+                      isCurrentRoom
+                          ? 'Current Room'
+                          : room.isAvailable
+                          ? 'Book'
+                          : 'Unavailable',
+                    ),
                   ),
               ],
             ),

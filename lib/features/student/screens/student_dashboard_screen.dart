@@ -26,11 +26,20 @@ class _StudentDashboardScreenState
     extends ConsumerState<StudentDashboardScreen> {
   int _tickerIndex = 0;
 
+  String _friendlyAnnouncementError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.contains('permission-denied')) {
+      return 'Announcements are unavailable for your account right now.';
+    }
+    return 'Announcements are unavailable right now.';
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final announcementsAsync =
-        ref.watch(announcementsForRoleProvider(AppConstants.roleStudent));
+    final announcementsAsync = ref.watch(
+      announcementsForRoleProvider(AppConstants.roleStudent),
+    );
     final firstName = user?.name.split(' ').first ?? 'Student';
     final now = DateTime.now();
     final greeting = _greeting(now.hour);
@@ -72,7 +81,7 @@ class _StudentDashboardScreenState
                     Text(
                       dateStr,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 13,
                       ),
                     ),
@@ -154,13 +163,13 @@ class _StudentDashboardScreenState
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Text(
                           'No announcements yet.',
-                          style: TextStyle(color: AppColors.textMutedOf(context)),
+                          style: TextStyle(
+                            color: AppColors.textMutedOf(context),
+                          ),
                         ),
                       );
                     }
-                    final ticker = list
-                        .map((a) => '📢 ${a.title}')
-                        .toList();
+                    final ticker = list.map((a) => '📢 ${a.title}').toList();
                     final i = _tickerIndex % ticker.length;
                     return _AnnouncementTicker(
                       message: ticker[i],
@@ -173,7 +182,12 @@ class _StudentDashboardScreenState
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: LinearProgressIndicator(),
                   ),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (e, _) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: _AnnouncementStatusCard(
+                      message: _friendlyAnnouncementError(e),
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 12),
@@ -247,7 +261,7 @@ class _RoomCard extends StatelessWidget {
                 Text(
                   'My Room',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -265,7 +279,7 @@ class _RoomCard extends StatelessWidget {
                 Text(
                   user?.hostel ?? '—',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 13,
                   ),
                 ),
@@ -278,7 +292,7 @@ class _RoomCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
@@ -356,9 +370,9 @@ class _QuickActionTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.15)),
+          border: Border.all(color: color.withValues(alpha: 0.15)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -399,14 +413,17 @@ class _AnnouncementTicker extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.warning.withOpacity(0.1),
+          color: AppColors.warning.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+          border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.campaign_rounded,
-                color: AppColors.warning, size: 18),
+            const Icon(
+              Icons.campaign_rounded,
+              color: AppColors.warning,
+              size: 18,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -423,6 +440,39 @@ class _AnnouncementTicker extends StatelessWidget {
             const Icon(Icons.chevron_right, color: AppColors.warning, size: 18),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AnnouncementStatusCard extends StatelessWidget {
+  final String message;
+
+  const _AnnouncementStatusCard({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.inputOf(context),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.dividerOf(context)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: AppColors.textHint, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textMutedOf(context),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

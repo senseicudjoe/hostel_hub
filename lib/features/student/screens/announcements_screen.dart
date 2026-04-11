@@ -22,6 +22,14 @@ class AnnouncementsScreen extends ConsumerStatefulWidget {
 class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
   final Set<String> _expanded = {};
 
+  String _friendlyError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.contains('permission-denied')) {
+      return 'Announcements are unavailable for this account right now.';
+    }
+    return 'Could not load announcements right now.';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdmin = ref.watch(isAdminProvider);
@@ -44,10 +52,12 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(left: 8),
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.25),
+                      color: Colors.white.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -79,7 +89,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: list.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final a = list[index];
               final id = a.announcementId;
@@ -100,14 +110,25 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
             },
           );
         },
-        loading: () =>
-            const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(
-              'Could not load announcements.\n$e',
-              textAlign: TextAlign.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.campaign_outlined,
+                  size: 44,
+                  color: AppColors.textHint,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _friendlyError(e),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textMutedOf(context)),
+                ),
+              ],
             ),
           ),
         ),
@@ -153,11 +174,14 @@ class _AnnouncementCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.campaign_rounded,
-                        color: AppColors.primary, size: 18),
+                    child: const Icon(
+                      Icons.campaign_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -188,7 +212,9 @@ class _AnnouncementCard extends StatelessWidget {
                             Text(
                               ' · ',
                               style: TextStyle(
-                                  color: AppColors.textMutedOf(context), fontSize: 11),
+                                color: AppColors.textMutedOf(context),
+                                fontSize: 11,
+                              ),
                             ),
                             Text(
                               dateStr,
@@ -224,8 +250,10 @@ class _AnnouncementCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.inputOf(context),
                     borderRadius: BorderRadius.circular(6),
@@ -233,8 +261,11 @@ class _AnnouncementCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.group_outlined,
-                          size: 13, color: AppColors.textMutedOf(context)),
+                      Icon(
+                        Icons.group_outlined,
+                        size: 13,
+                        color: AppColors.textMutedOf(context),
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         a.targetRole,
