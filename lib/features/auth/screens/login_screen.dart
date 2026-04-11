@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +11,7 @@ import '../../../core/theme/app_theme.dart';
 //
 // Supports:
 //  • Email + password login (Firebase Auth)
-//  • Two "Demo" shortcuts: Demo Student / Demo Admin
+//  • Debug-only demo shortcuts: Demo Student / Demo Admin
 //    → These set a fake user in the provider and skip Firebase entirely.
 //      Perfect for exploring all screens without a real account.
 //  • Biometric button (UI only — shows a SnackBar, needs local_auth package)
@@ -48,7 +49,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      final user = await ref.read(authServiceProvider).login(
+      final user = await ref
+          .read(authServiceProvider)
+          .login(
             email: _emailController.text.trim(),
             password: _passwordController.text,
           );
@@ -56,10 +59,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
 
       if (user == null) {
-        setState(() => _errorMessage =
-            'No profile found in the database for this account. '
-            'If you just registered, wait a moment and try again, '
-            'or contact SLE.');
+        setState(
+          () => _errorMessage =
+              'No profile found in the database for this account. '
+              'If you just registered, wait a moment and try again, '
+              'or contact SLE.',
+        );
         return;
       }
 
@@ -103,6 +108,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  void _loginAsDemoUser(String role) {
+    final user = role == AppConstants.roleAdmin
+        ? DemoUsers.admin
+        : DemoUsers.student;
+    ref.read(currentUserProvider.notifier).state = user;
+    context.go(role == AppConstants.roleAdmin ? '/admin' : '/home');
+  }
+
   Future<void> _forgotPassword(BuildContext context) async {
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
@@ -123,9 +136,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
   }
@@ -188,6 +201,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      textCapitalization: TextCapitalization.none,
+                      autocorrect: false,
+                      enableSuggestions: false,
                       decoration: const InputDecoration(
                         labelText: 'Email address',
                         hintText: 'you@ashesi.edu.gh',
@@ -221,7 +237,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 : Icons.visibility_off_outlined,
                           ),
                           onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                         ),
                       ),
                       validator: (v) {
@@ -241,13 +258,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.error.withOpacity(0.08),
+                          color: AppColors.error.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline,
-                                color: AppColors.error, size: 18),
+                            const Icon(
+                              Icons.error_outline,
+                              color: AppColors.error,
+                              size: 18,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -311,7 +331,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       'or continue with',
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textMutedOf(context).withValues(alpha: 0.8),
+                        color: AppColors.textMutedOf(
+                          context,
+                        ).withValues(alpha: 0.8),
                       ),
                     ),
                   ),
@@ -326,6 +348,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onPressed: _isLoading ? null : _signInWithGoogle,
               ),
 
+              if (kDebugMode) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () => _loginAsDemoUser(AppConstants.roleStudent),
+                        child: const Text('Demo Student'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () => _loginAsDemoUser(AppConstants.roleAdmin),
+                        child: const Text('Demo Admin'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
               const SizedBox(height: 12),
 
               // ── Biometric button ──────────────────────────────
@@ -334,7 +381,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
-                          'Biometric login available after first sign-in'),
+                        'Biometric login available after first sign-in',
+                      ),
                     ),
                   );
                 },
@@ -380,12 +428,30 @@ class _GoogleSignInButton extends StatelessWidget {
             text: const TextSpan(
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               children: [
-                TextSpan(text: 'G', style: TextStyle(color: Color(0xFF4285F4))),
-                TextSpan(text: 'o', style: TextStyle(color: Color(0xFFEA4335))),
-                TextSpan(text: 'o', style: TextStyle(color: Color(0xFFFBBC05))),
-                TextSpan(text: 'g', style: TextStyle(color: Color(0xFF4285F4))),
-                TextSpan(text: 'l', style: TextStyle(color: Color(0xFF34A853))),
-                TextSpan(text: 'e', style: TextStyle(color: Color(0xFFEA4335))),
+                TextSpan(
+                  text: 'G',
+                  style: TextStyle(color: Color(0xFF4285F4)),
+                ),
+                TextSpan(
+                  text: 'o',
+                  style: TextStyle(color: Color(0xFFEA4335)),
+                ),
+                TextSpan(
+                  text: 'o',
+                  style: TextStyle(color: Color(0xFFFBBC05)),
+                ),
+                TextSpan(
+                  text: 'g',
+                  style: TextStyle(color: Color(0xFF4285F4)),
+                ),
+                TextSpan(
+                  text: 'l',
+                  style: TextStyle(color: Color(0xFF34A853)),
+                ),
+                TextSpan(
+                  text: 'e',
+                  style: TextStyle(color: Color(0xFFEA4335)),
+                ),
               ],
             ),
           ),

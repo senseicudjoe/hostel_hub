@@ -26,10 +26,10 @@ class AuthService {
       );
 
       final user = UserModel(
-        uid:       credential.user!.uid,
-        name:      name,
-        email:     email,
-        role:      role,
+        uid: credential.user!.uid,
+        name: name,
+        email: email,
+        role: role,
         createdAt: DateTime.now(),
       );
 
@@ -52,10 +52,7 @@ class AuthService {
         password: password,
       );
 
-      final doc = await _db
-          .collection('users')
-          .doc(credential.user!.uid)
-          .get();
+      final doc = await _db.collection('users').doc(credential.user!.uid).get();
 
       if (doc.exists) return UserModel.fromMap(doc.data()!);
       return null;
@@ -122,7 +119,11 @@ class AuthService {
 
   // ── Password reset ───────────────────────────────────────
   Future<void> resetPassword(String email) async {
-    await _auth.sendPasswordResetEmail(email: email);
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      throw _handleError(e);
+    }
   }
 
   // ── Error handler ────────────────────────────────────────
@@ -131,13 +132,18 @@ class AuthService {
       case 'user-not-found':
         return 'No account found with this email.';
       case 'wrong-password':
-        return 'Incorrect password.';
+      case 'invalid-credential':
+        return 'Incorrect email or password.';
+      case 'user-disabled':
+        return 'This account has been disabled. Contact support.';
       case 'email-already-in-use':
         return 'An account already exists with this email.';
       case 'weak-password':
         return 'Password is too weak. Use at least 6 characters.';
       case 'invalid-email':
         return 'Invalid email address.';
+      case 'network-request-failed':
+        return 'Network error. Check your connection and try again.';
       case 'too-many-requests':
         return 'Too many attempts. Please try again later.';
       default:

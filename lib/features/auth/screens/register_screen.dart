@@ -30,7 +30,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
-  String _role = AppConstants.roleStudent;
+  final String _role = AppConstants.roleStudent;
 
   @override
   void dispose() {
@@ -49,7 +49,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
 
     try {
-      final user = await ref.read(authServiceProvider).register(
+      final user = await ref
+          .read(authServiceProvider)
+          .register(
             name: _nameController.text.trim(),
             email: _emailController.text.trim(),
             password: _passwordController.text,
@@ -152,6 +154,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      textCapitalization: TextCapitalization.none,
+                      autocorrect: false,
+                      enableSuggestions: false,
                       decoration: const InputDecoration(
                         labelText: 'Email',
                         hintText: 'you@ashesi.edu.gh',
@@ -181,7 +186,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 : Icons.visibility_off_outlined,
                           ),
                           onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                         ),
                       ),
                       validator: (v) {
@@ -211,13 +217,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.error.withOpacity(0.08),
+                          color: AppColors.error.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline,
-                                color: AppColors.error, size: 18),
+                            const Icon(
+                              Icons.error_outline,
+                              color: AppColors.error,
+                              size: 18,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
