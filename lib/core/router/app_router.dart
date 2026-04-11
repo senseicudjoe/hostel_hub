@@ -97,7 +97,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               loc == '/profile' ||
               loc == '/home/announcements';
           if (onStudentShell) {
-            return loc == '/announcements' ? '/admin/announcements' : '/admin';
+            return loc == '/home/announcements'
+                ? '/admin/announcements'
+                : '/admin';
           }
         } else {
           if (loc.startsWith('/admin')) return '/home';
@@ -158,6 +160,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home',
                 builder: (context, state) => const StudentDashboardScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'announcements',
+                    builder: (context, state) => const AnnouncementsScreen(),
+                  ),
+                ],
               ),
             ],
           ),

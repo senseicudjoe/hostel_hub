@@ -306,9 +306,9 @@ class _ComposeAnnouncementScreenState
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.cardOf(context),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.divider),
+                border: Border.all(color: AppColors.dividerOf(context)),
               ),
               child: Column(
                 children: [
@@ -465,9 +465,9 @@ class _AnnouncementPreviewState extends State<_AnnouncementPreview> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.cardOf(context),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.divider),
+            border: Border.all(color: AppColors.dividerOf(context)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

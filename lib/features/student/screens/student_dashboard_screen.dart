@@ -109,7 +109,7 @@ class _StudentDashboardScreenState
                     ),
                   ],
                 ),
-                onPressed: () => context.push('/announcements'),
+                onPressed: () => context.go('/home/announcements'),
               ),
             ],
           ),
@@ -150,7 +150,7 @@ class _StudentDashboardScreenState
                       ),
                     ),
                     TextButton(
-                      onPressed: () => context.push('/announcements'),
+                      onPressed: () => context.go('/home/announcements'),
                       child: const Text('See all'),
                     ),
                   ],
@@ -410,7 +410,7 @@ class _QuickActionGrid extends StatelessWidget {
           icon: Icons.campaign_rounded,
           label: 'Announce-\nments',
           color: const Color(0xFF6A1B9A),
-          onTap: () => context.push('/announcements'),
+          onTap: () => context.go('/home/announcements'),
         ),
       ],
     );

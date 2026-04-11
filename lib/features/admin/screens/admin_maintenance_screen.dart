@@ -55,7 +55,7 @@ class _AdminMaintenanceScreenState
           return Column(
             children: [
               Container(
-                color: Colors.white,
+                color: AppColors.cardOf(context),
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
                 child: TextField(
                   onChanged: (v) =>
@@ -67,7 +67,7 @@ class _AdminMaintenanceScreenState
                 ),
               ),
               Container(
-                color: Colors.white,
+                color: AppColors.cardOf(context),
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
