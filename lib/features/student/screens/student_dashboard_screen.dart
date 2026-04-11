@@ -109,7 +109,7 @@ class _StudentDashboardScreenState
                     ),
                   ],
                 ),
-                onPressed: () => context.go('/announcements'),
+                onPressed: () => context.go('/home/announcements'),
               ),
             ],
           ),
@@ -150,7 +150,7 @@ class _StudentDashboardScreenState
                       ),
                     ),
                     TextButton(
-                      onPressed: () => context.go('/announcements'),
+                      onPressed: () => context.go('/home/announcements'),
                       child: const Text('See all'),
                     ),
                   ],
@@ -240,8 +240,75 @@ class _RoomCard extends StatelessWidget {
   final dynamic user;
   const _RoomCard({this.user});
 
+  bool get _hasRoom =>
+      (user?.roomNumber?.toString().trim().isNotEmpty ?? false) &&
+      (user?.hostel?.toString().trim().isNotEmpty ?? false);
+
   @override
   Widget build(BuildContext context) {
+    if (!_hasRoom) {
+      // ── No room booked yet ──────────────────────────────
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardOf(context),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.dividerOf(context),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.hotel_outlined,
+                  color: AppColors.warning, size: 26),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No room booked yet',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textOf(context),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Browse available rooms and book one.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMutedOf(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: () => context.go('/explore'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(72, 36),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: const Text('Explore'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ── Room assigned ───────────────────────────────────
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -268,7 +335,7 @@ class _RoomCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  user?.roomNumber ?? 'Not Assigned',
+                  user?.roomNumber ?? '',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 28,
@@ -277,7 +344,7 @@ class _RoomCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  user?.hostel ?? '—',
+                  user?.hostel ?? '',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 13,
@@ -286,7 +353,6 @@ class _RoomCard extends StatelessWidget {
               ],
             ),
           ),
-          // Navigate button
           GestureDetector(
             onTap: () => context.go('/room'),
             child: Container(
@@ -344,7 +410,7 @@ class _QuickActionGrid extends StatelessWidget {
           icon: Icons.campaign_rounded,
           label: 'Announce-\nments',
           color: const Color(0xFF6A1B9A),
-          onTap: () => context.go('/announcements'),
+          onTap: () => context.go('/home/announcements'),
         ),
       ],
     );

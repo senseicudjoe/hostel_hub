@@ -15,9 +15,12 @@ function mapMaintenance(
     requestId,
     studentUid: String(data.studentUid ?? ""),
     title: String(data.title ?? ""),
+    description: String(data.description ?? ""),
     category: String(data.category ?? "General"),
     status: String(data.status ?? "pending"),
     assignedTo: String(data.assignedTo ?? ""),
+    hostelName: String(data.hostelName ?? ""),
+    roomNumber: String(data.roomNumber ?? ""),
     createdAt: parseFirestoreDate(data.createdAt),
   };
 }

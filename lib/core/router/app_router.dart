@@ -59,8 +59,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         final isAdmin = user.role == AppConstants.roleAdmin;
 
         // ── Email verification gate ────────────────────────────────────────
-        // Students must verify their email before accessing the app.
-        // Admin accounts are provisioned externally and exempt from this check.
         final emailVerified =
             FirebaseAuth.instance.currentUser?.emailVerified ?? true;
         if (!isAdmin && !emailVerified) {
@@ -82,9 +80,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               loc.startsWith('/room') ||
               (loc.startsWith('/maintenance') && !loc.startsWith('/admin')) ||
               loc == '/profile' ||
-              loc == '/announcements';
+              loc == '/home/announcements';
           if (onStudentShell) {
-            return loc == '/announcements'
+            return loc == '/home/announcements'
                 ? '/admin/announcements'
                 : '/admin';
           }
@@ -133,11 +131,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           return StudentShell(navigationShell: navigationShell);
         },
         branches: [
-          // Tab 0 — Home / Dashboard
+          // Tab 0 — Home / Dashboard (+ announcements nested so nav bar persists)
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/home',
               builder: (context, state) => const StudentDashboardScreen(),
+              routes: [
+                GoRoute(
+                  path: 'announcements',
+                  builder: (context, state) => const AnnouncementsScreen(),
+                ),
+              ],
             ),
           ]),
 
@@ -185,12 +189,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ]),
         ],
-      ),
-
-      // ── Standalone Student routes ─────────────────────────────────────────
-      GoRoute(
-        path: '/announcements',
-        builder: (context, state) => const AnnouncementsScreen(),
       ),
 
       // ── Admin Shell ───────────────────────────────────────────────────────

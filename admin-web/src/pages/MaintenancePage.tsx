@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { StatusBadge } from "../components/StatusBadge";
 import { useFirestoreMaintenance } from "../hooks/useFirestoreMaintenance";
 import { updateMaintenanceRequest } from "../services/adminFirestore";
@@ -53,6 +53,8 @@ export function MaintenancePage() {
     Record<string, { status: string; assignedTo: string }>
   >({});
 
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   const filtered = useMemo(() => {
     return requests.filter((r) => {
       const okStatus = matchesFilter(r.status, statusFilter);
@@ -60,6 +62,7 @@ export function MaintenancePage() {
       const okSearch =
         !q ||
         r.title.toLowerCase().includes(q) ||
+        r.description.toLowerCase().includes(q) ||
         r.requestId.toLowerCase().includes(q) ||
         r.studentUid.toLowerCase().includes(q);
       return okStatus && okSearch;
@@ -72,7 +75,8 @@ export function MaintenancePage() {
         <h2 className="text-lg font-bold text-ink">Maintenance</h2>
         <p className="text-sm text-ink-muted">
           Status changes save to Firestore; students see updates in the app via
-          live listeners on their own requests.
+          live listeners on their own requests. Click a row (outside the Update
+          column) to read the full description.
         </p>
       </div>
 
@@ -144,12 +148,19 @@ export function MaintenancePage() {
                   status: r.status,
                   assignedTo: r.assignedTo,
                 };
+                const open = expandedId === r.id;
                 return (
+                  <Fragment key={r.id}>
                   <tr
-                    key={r.id}
-                    className="border-b border-line last:border-0 hover:bg-input/30"
+                    className={`cursor-pointer border-b border-line last:border-0 hover:bg-input/30 ${
+                      open ? "bg-brand-light/40" : ""
+                    }`}
+                    onClick={() =>
+                      setExpandedId((id) => (id === r.id ? null : r.id))
+                    }
                   >
                     <td className="px-3 py-3 font-mono text-[11px] text-ink-muted">
+                      <span className="mr-1 text-ink-hint">{open ? "▼" : "▶"}</span>
                       {r.requestId}
                     </td>
                     <td className="max-w-[180px] px-3 py-3 font-medium text-ink">
@@ -164,7 +175,10 @@ export function MaintenancePage() {
                     <td className="whitespace-nowrap px-3 py-3 text-ink-muted">
                       {r.createdAt.toLocaleDateString()}
                     </td>
-                    <td className="px-3 py-3 align-top">
+                    <td
+                      className="px-3 py-3 align-top"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <select
                           value={draft.status}
@@ -245,6 +259,24 @@ export function MaintenancePage() {
                       ) : null}
                     </td>
                   </tr>
+                  {open ? (
+                    <tr className="border-b border-line bg-input/50 last:border-0">
+                      <td colSpan={6} className="px-4 py-4 text-sm text-ink">
+                        <p className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-muted">
+                          Description
+                        </p>
+                        <p className="whitespace-pre-wrap leading-relaxed">
+                          {r.description.trim() ? r.description : "—"}
+                        </p>
+                        {(r.hostelName || r.roomNumber) ? (
+                          <p className="mt-3 text-xs text-ink-muted">
+                            {[r.hostelName, r.roomNumber].filter(Boolean).join(" · ")}
+                          </p>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>

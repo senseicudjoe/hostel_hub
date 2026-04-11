@@ -10,11 +10,14 @@ export const COLLECTIONS = {
 export const ROLE_ADMIN = "admin";
 export const ROLE_STUDENT = "student";
 
-/** Default hostel names (rooms may use any string). */
+/** Ashesi University campus hostel names. */
 export const HOSTEL_NAMES = [
-  "Unity Hall",
-  "Freedom Hall",
-  "Independence Hall",
+  "Sutherland Hall",
+  "Sisulu Hall",
+  "Amu Hall",
+  "Oteng Korankye II Hall",
+  "Maathai Hall",
+  "Tawiah Hall",
 ] as const;
 
 export const ROOM_STATUS = {

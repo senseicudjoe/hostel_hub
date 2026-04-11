@@ -40,11 +40,13 @@ class _ComposeAnnouncementScreenState
 
   static const _targetOptions = [
     'All Residents',
-    'Unity Hall',
-    'Freedom Hall',
-    'Independence Hall',
+    'Sutherland Hall',
+    'Sisulu Hall',
+    'Amu Hall',
+    'Oteng Korankye II Hall',
+    'Maathai Hall',
+    'Tawiah Hall',
     'Students Only',
-    'Staff Only',
   ];
 
   @override
