@@ -279,6 +279,7 @@ class _BiometricSettingsScreenState
           return RefreshIndicator(
             onRefresh: _refreshStatus,
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               children: [
                 _InfoCard(

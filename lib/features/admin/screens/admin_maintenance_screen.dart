@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/maintenance_request.dart';
 import '../../../shared/widgets/status_chip.dart';
@@ -111,47 +113,95 @@ class _AdminMaintenanceScreenState
                 ),
               ),
               Expanded(
-                child: filtered.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No requests match your filter',
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, i) => const SizedBox(height: 8),
-                        itemBuilder: (context, i) {
-                          final r = filtered[i];
-                          return _RequestTile(
-                            request: r,
-                            onAssign: (name) async {
-                              await ref
-                                  .read(firestoreServiceProvider)
-                                  .updateMaintenanceStatus(
-                                    requestId: r.requestId,
-                                    status: 'assigned',
-                                    assignedTo: name,
-                                  );
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
+                child: RefreshIndicator(
+                  onRefresh: () =>
+                      ref.refreshProvider(allMaintenanceRequestsProvider),
+                  child: filtered.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height:
+                                  MediaQuery.sizeOf(context).height * 0.55,
+                              child: const Center(
+                                child: Text(
+                                  'No requests match your filter',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(12),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, i) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (context, i) {
+                            final r = filtered[i];
+                            return _RequestTile(
+                              request: r,
+                              onAssign: (name) async {
+                                await ref
+                                    .read(firestoreServiceProvider)
+                                    .updateMaintenanceStatus(
+                                      requestId: r.requestId,
+                                      status: 'assigned',
+                                      assignedTo: name,
+                                    );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(
+                                    SnackBar(
                                       content: Text(
-                                          '${r.requestId} assigned to $name')),
-                                );
-                              }
-                            },
-                          );
-                        },
-                      ),
+                                        '${r.requestId} assigned to $name',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            );
+                          },
+                        ),
+                ),
               ),
             ],
           );
         },
-        loading: () =>
-            const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        loading: () => RefreshIndicator(
+          onRefresh: () =>
+              ref.refreshProvider(allMaintenanceRequestsProvider),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        error: (e, _) => RefreshIndicator(
+          onRefresh: () =>
+              ref.refreshProvider(allMaintenanceRequestsProvider),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            children: [
+              SizedBox(
+                height: MediaQuery.sizeOf(context).height * 0.55,
+                child: Center(child: Text('$e', textAlign: TextAlign.center)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -214,6 +264,44 @@ class _RequestTile extends StatelessWidget {
               Text('Assigned: ${request.assignedTo}',
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.success)),
+            if (request.imageUrls.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 80,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: request.imageUrls.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) => ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: request.imageUrls[i],
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        width: 80,
+                        height: 80,
+                        color: AppColors.inputOf(context),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        width: 80,
+                        height: 80,
+                        color: AppColors.inputOf(context),
+                        child: const Icon(Icons.broken_image_outlined, size: 20),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,

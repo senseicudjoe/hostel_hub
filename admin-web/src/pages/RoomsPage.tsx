@@ -32,9 +32,8 @@ export function RoomsPage() {
   const [hostelFilter, setHostelFilter] = useState<string | null>(null);
 
   const hostels = useMemo(() => {
-    const fromData = [...new Set(rooms.map((r) => r.hostelName))].filter(Boolean);
-    const merged = [...new Set([...HOSTEL_NAMES, ...fromData])].sort();
-    return merged;
+    const fromData = [...new Set(rooms.map((r) => r.hostelName))].filter(Boolean).sort();
+    return fromData.length > 0 ? fromData : [...HOSTEL_NAMES];
   }, [rooms]);
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/maintenance_request.dart';
 import '../../../shared/widgets/status_chip.dart';
@@ -50,7 +51,13 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
     final async = ref.watch(studentMaintenanceRequestsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Maintenance')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.go('/home'),
+        ),
+        title: const Text('Maintenance'),
+      ),
       body: Column(
         children: [
           // Tab bar strip — sits below the AppBar
@@ -73,18 +80,50 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
                 controller: _tabController,
                 children: List.generate(4, (i) {
                   final filtered = _filter(requests, i);
-                  return _RequestList(requests: filtered);
+                  return RefreshIndicator(
+                    onRefresh: () =>
+                        ref.refreshProvider(studentMaintenanceRequestsProvider),
+                    child: _RequestList(requests: filtered),
+                  );
                 }),
               ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Padding(
+              loading: () => RefreshIndicator(
+                onRefresh: () =>
+                    ref.refreshProvider(studentMaintenanceRequestsProvider),
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              error: (e, _) => RefreshIndicator(
+                onRefresh: () =>
+                    ref.refreshProvider(studentMaintenanceRequestsProvider),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(24),
-                  child: Text(
-                    'Could not load requests.\n$e',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.textMutedOf(context)),
-                  ),
+                  children: [
+                    SizedBox(
+                      height: MediaQuery.sizeOf(context).height * 0.55,
+                      child: Center(
+                        child: Text(
+                          'Could not load requests.\n$e',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.textMutedOf(context),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -107,29 +146,38 @@ class _RequestList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (requests.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.inbox_outlined,
-              size: 56,
-              color: AppColors.textHint,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No requests here',
-              style: TextStyle(
-                color: AppColors.textMutedOf(context),
-                fontSize: 15,
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.65,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.inbox_outlined,
+                    size: 56,
+                    color: AppColors.textHint,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No requests here',
+                    style: TextStyle(
+                      color: AppColors.textMutedOf(context),
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: requests.length,
       separatorBuilder: (context, index) => const SizedBox(height: 10),

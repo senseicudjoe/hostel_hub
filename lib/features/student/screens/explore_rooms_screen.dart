@@ -1,9 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/hostel_assets.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/room_model.dart';
@@ -61,10 +63,13 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
 
   bool _bookableOnly = false;
 
+  Future<void> _refreshRooms() => ref.refreshProvider(roomsProvider);
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final roomsAsync = ref.watch(roomsProvider);
+    final minScrollHeight = MediaQuery.sizeOf(context).height * 0.55;
 
     return Scaffold(
       appBar: AppBar(
@@ -77,37 +82,127 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
                   _bookableOnly = false;
                 }),
               )
-            : null,
+            : IconButton(
+                tooltip: 'Home',
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () => context.go('/home'),
+              ),
         title: Text(_selectedHostel ?? 'Explore Rooms'),
         actions: [
           IconButton(
             tooltip: 'Refresh',
-            onPressed: () => ref.invalidate(roomsProvider),
+            onPressed: _refreshRooms,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
       body: roomsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text('Could not load rooms.\n$e'),
+        loading: () => RefreshIndicator(
+          onRefresh: _refreshRooms,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        error: (e, _) => RefreshIndicator(
+          onRefresh: _refreshRooms,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            children: [
+              SizedBox(
+                height: minScrollHeight,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.cloud_off_rounded,
+                        size: 48,
+                        color: AppColors.textHint,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Could not load rooms.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textOf(context),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '$e',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMutedOf(context),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Pull down to try again.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMutedOf(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         data: (rooms) {
           if (rooms.isEmpty) {
-            return const _EmptyHostels();
+            return RefreshIndicator(
+              onRefresh: _refreshRooms,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: minScrollHeight,
+                    child: const _EmptyHostels(),
+                  ),
+                ],
+              ),
+            );
           }
 
           if (_selectedHostel == null) {
             final summaries = _summarizeHostels(rooms);
             if (summaries.isEmpty) {
-              return const _EmptyHostels();
+              return RefreshIndicator(
+                onRefresh: _refreshRooms,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    SizedBox(
+                      height: minScrollHeight,
+                      child: const _EmptyHostels(),
+                    ),
+                  ],
+                ),
+              );
             }
-            return _HostelGrid(
-              summaries: summaries,
-              onHostelTap: (name) => setState(() => _selectedHostel = name),
+            return RefreshIndicator(
+              onRefresh: _refreshRooms,
+              child: _HostelGrid(
+                summaries: summaries,
+                onHostelTap: (name) => setState(() => _selectedHostel = name),
+              ),
             );
           }
 
@@ -129,29 +224,42 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
                     setState(() => _bookableOnly = v),
               ),
               Expanded(
-                child: filtered.isEmpty
-                    ? const _EmptyRooms()
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: filtered.length,
-                        separatorBuilder: (context, _) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final room = filtered[index];
-                          final isCurrentRoom =
-                              user != null &&
-                              user.hostel.trim() == room.hostelName &&
-                              user.roomNumber.trim() == room.roomNumber;
-                          return _RoomCard(
-                            room: room,
-                            canBook: user?.role == AppConstants.roleStudent,
-                            isCurrentRoom: isCurrentRoom,
-                            onBook: user == null || isCurrentRoom
-                                ? null
-                                : () => _confirmAndBook(context, room),
-                          );
-                        },
-                      ),
+                child: RefreshIndicator(
+                  onRefresh: _refreshRooms,
+                  child: filtered.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            SizedBox(
+                              height: minScrollHeight,
+                              child: const _EmptyRooms(),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filtered.length,
+                          separatorBuilder: (context, _) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final room = filtered[index];
+                            final isCurrentRoom =
+                                user != null &&
+                                user.hostel.trim() == room.hostelName &&
+                                user.roomNumber.trim() == room.roomNumber;
+                            return _RoomCard(
+                              room: room,
+                              canBook: user?.role == AppConstants.roleStudent,
+                              isCurrentRoom: isCurrentRoom,
+                              onBook: user == null || isCurrentRoom
+                                  ? null
+                                  : () => _confirmAndBook(context, room),
+                            );
+                          },
+                        ),
+                ),
               ),
             ],
           );
@@ -256,6 +364,7 @@ class _HostelGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,

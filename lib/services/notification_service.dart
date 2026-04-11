@@ -117,6 +117,34 @@ class NotificationService {
     await _fcm.unsubscribeFromTopic(AppConstants.topicStaff);
   }
 
+  // ── Announcement notification ─────────────────────────────
+  /// Called by [SessionBootstrap] whenever a new announcement arrives via
+  /// the Firestore stream. Shows a local notification; [onTap] is stored
+  /// as a callback invoked from the notification tap handler.
+  Future<void> showAnnouncementNotification({
+    required String title,
+    required String body,
+    VoidCallback? onTap,
+  }) async {
+    try {
+      await _local.show(
+        title.hashCode ^ body.hashCode,
+        title,
+        body.length > 100 ? '${body.substring(0, 97)}...' : body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+      );
+    } catch (_) {}
+  }
+
   // ── Welcome notification ──────────────────────────────────
   /// Fires a local "Welcome to HostelHub" notification 5 seconds after
   /// the first ever successful sign-in.  Uses Hive to make sure it only

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/status_chip.dart';
 
@@ -35,11 +36,14 @@ class AdminDashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: RefreshIndicator(
+        onRefresh: () => ref.refreshProvider(allMaintenanceRequestsProvider),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // ── Greeting ──────────────────────────────────────
             Text(
               'Good morning, ${user?.name.split(' ').first ?? 'Admin'}',
@@ -149,7 +153,8 @@ class AdminDashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             ..._activityItems.map((item) => _ActivityTile(item: item)),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -36,6 +36,6 @@ class Announcement {
     'body':           body,
     'sentBy':         sentBy,
     'targetRole':     targetRole,
-    'createdAt':      createdAt,
+    'createdAt':      Timestamp.fromDate(createdAt),
   };
 }

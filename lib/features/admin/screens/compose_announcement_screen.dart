@@ -46,6 +46,10 @@ class _ComposeAnnouncementScreenState
     'Oteng Korankye II Hall',
     'Maathai Hall',
     'Tawiah Hall',
+    'Unity Hall',
+    'Freedom Hall',
+    'Commonwealth Hall',
+    'Independence Hall',
     'Students Only',
   ];
 

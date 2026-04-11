@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/announcement.dart';
 import '../../models/user_model.dart';
+import '../constants/app_constants.dart';
 import '../providers/app_providers.dart';
+import '../router/app_router.dart';
 
 /// Hydrates [currentUserProvider] from Firestore when Firebase Auth has a
 /// session. If the user has enabled biometric login, they are prompted to
@@ -21,6 +26,17 @@ class SessionBootstrap extends ConsumerStatefulWidget {
 
 class _SessionBootstrapState extends ConsumerState<SessionBootstrap> {
   bool _notificationsStarted = false;
+
+  /// IDs of announcements seen so far — used to detect newly arrived ones.
+  final Set<String> _seenAnnouncementIds = {};
+  bool _firstAnnouncementLoad = true;
+  StreamSubscription<List<Announcement>>? _announcementSub;
+
+  @override
+  void dispose() {
+    _announcementSub?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -91,7 +107,52 @@ class _SessionBootstrapState extends ConsumerState<SessionBootstrap> {
 
       // Fire the one-time welcome notification 5 s after the very first sign-in.
       await n.showWelcomeNotificationIfNeeded(user.name);
+
+      // ── Real-time announcement notifications ──────────────────────────────
+      // Students get a local notification whenever a new announcement is posted,
+      // as long as the app is running (foreground or background).
+      // Admins don't get notified for their own posts.
+      if (user.role != AppConstants.roleAdmin) {
+        _startAnnouncementListener(user.role);
+      }
     } catch (_) {}
+  }
+
+  void _startAnnouncementListener(String role) {
+    _announcementSub?.cancel();
+    _announcementSub = ref
+        .read(firestoreServiceProvider)
+        .getAnnouncements(role)
+        .listen((announcements) {
+      if (!mounted) return;
+
+      if (_firstAnnouncementLoad) {
+        // Seed seen IDs on first load — don't notify for existing announcements.
+        _seenAnnouncementIds.addAll(
+          announcements.map((a) => a.announcementId),
+        );
+        _firstAnnouncementLoad = false;
+        return;
+      }
+
+      for (final a in announcements) {
+        if (_seenAnnouncementIds.contains(a.announcementId)) continue;
+        _seenAnnouncementIds.add(a.announcementId);
+        _showAnnouncementNotification(a);
+      }
+    });
+  }
+
+  void _showAnnouncementNotification(Announcement a) {
+    ref.read(notificationServiceProvider).showAnnouncementNotification(
+      title: a.title,
+      body: a.body,
+      onTap: () {
+        if (mounted) {
+          ref.read(routerProvider).go('/home/announcements');
+        }
+      },
+    );
   }
 
   @override

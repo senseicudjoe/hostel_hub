@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../models/announcement.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,8 +47,13 @@ class _StudentDashboardScreenState
     final dateStr = DateFormat('EEEE, d MMMM').format(now);
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () => ref.refreshProvider(
+          announcementsForRoleProvider(AppConstants.roleStudent),
+        ),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           // ── Collapsing AppBar ──────────────────────────────
           SliverAppBar(
             expandedHeight: 160,
@@ -197,6 +203,7 @@ class _StudentDashboardScreenState
             ),
           ),
         ],
+        ),
       ),
     );
   }

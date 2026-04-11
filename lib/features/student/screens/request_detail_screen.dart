@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/maintenance_request.dart';
 import '../../../shared/widgets/status_chip.dart';
@@ -52,22 +53,67 @@ class RequestDetailScreen extends ConsumerWidget {
         if (req == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Request')),
-            body: const Center(child: Text('Request not found.')),
+            body: RefreshIndicator(
+              onRefresh: () => ref.refreshProvider(
+                maintenanceRequestProvider(requestId),
+              ),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height * 0.55,
+                    child: const Center(
+                      child: Text('Request not found.'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           );
         }
-        return _detailBody(context, req);
+        return _detailBody(context, ref, requestId, req);
       },
       loading: () => Scaffold(
         appBar: AppBar(title: const Text('Request')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: RefreshIndicator(
+          onRefresh: () => ref.refreshProvider(
+            maintenanceRequestProvider(requestId),
+          ),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       error: (e, _) => Scaffold(
         appBar: AppBar(title: const Text('Request')),
-        body: Center(
-          child: Padding(
+        body: RefreshIndicator(
+          onRefresh: () => ref.refreshProvider(
+            maintenanceRequestProvider(requestId),
+          ),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(24),
-            child: Text('Could not load request.\n$e',
-                textAlign: TextAlign.center),
+            children: [
+              SizedBox(
+                height: MediaQuery.sizeOf(context).height * 0.55,
+                child: Center(
+                  child: Text(
+                    'Could not load request.\n$e',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -75,7 +121,12 @@ class RequestDetailScreen extends ConsumerWidget {
   }
 }
 
-Widget _detailBody(BuildContext context, MaintenanceRequest req) {
+Widget _detailBody(
+  BuildContext context,
+  WidgetRef ref,
+  String requestId,
+  MaintenanceRequest req,
+) {
   final currentStageIndex = _timelineIndex(req.status);
   final dateStr = DateFormat('MMM d, y').format(req.createdAt);
   final roomLabel =
@@ -85,11 +136,15 @@ Widget _detailBody(BuildContext context, MaintenanceRequest req) {
     appBar: AppBar(
       title: Text(req.requestId),
     ),
-    body: SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    body: RefreshIndicator(
+      onRefresh: () =>
+          ref.refreshProvider(maintenanceRequestProvider(requestId)),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -209,6 +264,7 @@ Widget _detailBody(BuildContext context, MaintenanceRequest req) {
           ),
           const SizedBox(height: 16),
         ],
+        ),
       ),
     ),
   );

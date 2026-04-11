@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/room_model.dart';
 
@@ -84,35 +85,76 @@ class _AdminRoomManagementScreenState
                 ),
               ),
               Expanded(
-                child: filtered.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No rooms in Firestore for this filter.',
-                          style: TextStyle(color: AppColors.textSecondary),
+                child: RefreshIndicator(
+                  onRefresh: () => ref.refreshProvider(roomsProvider),
+                  child: filtered.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height:
+                                  MediaQuery.sizeOf(context).height * 0.55,
+                              child: const Center(
+                                child: Text(
+                                  'No rooms in Firestore for this filter.',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : GridView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 10,
+                            crossAxisSpacing: 10,
+                            childAspectRatio: 1.4,
+                          ),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final r = filtered[i];
+                            return _RoomTile(room: r);
+                          },
                         ),
-                      )
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: 1.4,
-                        ),
-                        itemCount: filtered.length,
-                        itemBuilder: (context, i) {
-                          final r = filtered[i];
-                          return _RoomTile(room: r);
-                        },
-                      ),
+                ),
               ),
             ],
           );
         },
-        loading: () =>
-            const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        loading: () => RefreshIndicator(
+          onRefresh: () => ref.refreshProvider(roomsProvider),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        error: (e, _) => RefreshIndicator(
+          onRefresh: () => ref.refreshProvider(roomsProvider),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            children: [
+              SizedBox(
+                height: MediaQuery.sizeOf(context).height * 0.55,
+                child: Center(child: Text('$e', textAlign: TextAlign.center)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/maintenance_request.dart';
 
@@ -171,18 +172,24 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('New Request')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // ── Auto-filled Room Info ─────────────────────────
-            _RoomInfoBanner(
-              hostel: user?.hostel ?? 'Sutherland Hall',
-              room: user?.roomNumber ?? 'S-204',
-            ),
-
-            const SizedBox(height: 20),
+      body: RefreshIndicator(
+        onRefresh: () => ref.reloadCurrentUserFromFirestore(),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+            // ── Auto-filled Room Info (only when student has a room) ──────
+            if (user != null &&
+                user.hostel.isNotEmpty &&
+                user.roomNumber.isNotEmpty) ...[
+              _RoomInfoBanner(
+                hostel: user.hostel,
+                room: user.roomNumber,
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // ── Category ──────────────────────────────────────
             const _SectionLabel(label: 'Category *'),
@@ -303,6 +310,7 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
             const SizedBox(height: 24),
           ],
         ),
+        ),
       ),
     );
   }
@@ -346,12 +354,15 @@ class _RoomInfoBanner extends StatelessWidget {
           const Icon(Icons.meeting_room_rounded,
               color: AppColors.success, size: 18),
           const SizedBox(width: 8),
-          Text(
-            'Room auto-filled: $room — $hostel',
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.success,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Text(
+              '$room — $hostel',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.success,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

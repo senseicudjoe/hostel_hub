@@ -38,7 +38,7 @@ class AppConstants {
   static const String profileImagesPath     = 'profile_images';
   static const String maintenanceImagesPath = 'maintenance_images';
 
-  // Ashesi University campus hostels
+  // Residential hall names (must match Firestore `hostelName` on rooms).
   static const List<String> hostels = [
     'Sutherland Hall',
     'Sisulu Hall',
@@ -46,5 +46,9 @@ class AppConstants {
     'Oteng Korankye II Hall',
     'Maathai Hall',
     'Tawiah Hall',
+    'Unity Hall',
+    'Freedom Hall',
+    'Commonwealth Hall',
+    'Independence Hall',
   ];
 }

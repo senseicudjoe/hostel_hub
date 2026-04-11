@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/room_model.dart';
 import '../../../models/user_model.dart';
@@ -26,121 +27,163 @@ class MyRoomScreen extends ConsumerWidget {
         (user?.hostel.trim().isNotEmpty ?? false);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Room')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!hasRoom) ...[
-              _NoRoomCard(onExplore: () => context.go('/explore')),
-              const SizedBox(height: 16),
-            ],
-
-            // ── Room details ─────────────────────────────────────
-            roomAsync.when(
-              loading: () => hasRoom
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  : const SizedBox.shrink(),
-              error: (_, __) =>
-                  _RoomDetailsCard(user: user, room: null, hasRoom: hasRoom),
-              data: (room) =>
-                  _RoomDetailsCard(user: user, room: room, hasRoom: hasRoom),
-            ),
-
-            // ── Room photos ──────────────────────────────────────
-            if (hasRoom)
-              roomAsync.maybeWhen(
-                data: (room) {
-                  if (room == null || room.imageUrls.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: _RoomPhotosCard(imageUrls: room.imageUrls),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.go('/home'),
+        ),
+        title: const Text('My Room'),
+      ),
+      body: !hasRoom
+          ? RefreshIndicator(
+              onRefresh: () => ref.reloadCurrentUserFromFirestore(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: _NoRoomAssignedBody(
+                        onExplore: () => context.go('/explore'),
+                        onHome: () => context.go('/home'),
+                      ),
+                    ),
                   );
                 },
-                orElse: () => const SizedBox.shrink(),
               ),
-
-            // ── Roommates ────────────────────────────────────────
-            if (hasRoom) ...[
-              const SizedBox(height: 16),
-              roommatesAsync.when(
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-                data: (roommates) => _RoommatesCard(roommates: roommates),
+            )
+          : RefreshIndicator(
+              onRefresh: () async {
+                await ref.refreshProvider(myRoomProvider);
+                await ref.refreshProvider(roommatesProvider);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  roomAsync.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (_, __) =>
+                        _RoomDetailsCard(user: user, room: null, hasRoom: hasRoom),
+                    data: (room) =>
+                        _RoomDetailsCard(user: user, room: room, hasRoom: hasRoom),
+                  ),
+                  roomAsync.maybeWhen(
+                    data: (room) {
+                      if (room == null || room.imageUrls.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: _RoomPhotosCard(imageUrls: room.imageUrls),
+                      );
+                    },
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 16),
+                  roommatesAsync.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (roommates) => _RoommatesCard(roommates: roommates),
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.search_rounded),
+                    label: const Text('Explore other rooms'),
+                    onPressed: () => context.go('/explore'),
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ),
-            ],
-
-            const SizedBox(height: 16),
-
-            OutlinedButton.icon(
-              icon: const Icon(Icons.search_rounded),
-              label: Text(hasRoom ? 'Explore other rooms' : 'Explore rooms'),
-              onPressed: () => context.go('/explore'),
             ),
-
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
+            ),
     );
   }
 }
 
-// ── No Room Card ──────────────────────────────────────────────────────────────
+// ── No room assigned (full-page, matches Explore empty-state style) ─────────
 
-class _NoRoomCard extends StatelessWidget {
+class _NoRoomAssignedBody extends StatelessWidget {
+  const _NoRoomAssignedBody({
+    required this.onExplore,
+    required this.onHome,
+  });
+
   final VoidCallback onExplore;
-  const _NoRoomCard({required this.onExplore});
+  final VoidCallback onHome;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: const Icon(
+                  Icons.bed_outlined,
+                  size: 44,
+                  color: AppColors.primary,
+                ),
               ),
-              child: const Icon(Icons.info_outline, color: AppColors.warning),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'No room assigned yet',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textOf(context),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Explore available rooms and book one.',
-                    style: TextStyle(color: AppColors.textMutedOf(context)),
-                  ),
-                ],
+              const SizedBox(height: 22),
+              Text(
+                'No room yet',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textOf(context),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: onExplore,
-              child: const Text('Explore'),
-            ),
-          ],
+              const SizedBox(height: 10),
+              Text(
+                'Open Explore to browse hostels and book a bed. Your room details, photos, and roommates will show up here once you are assigned.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: AppColors.textMutedOf(context),
+                ),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: onExplore,
+                  icon: const Icon(Icons.explore_rounded),
+                  label: const Text('Go to Explore'),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onHome,
+                  icon: const Icon(Icons.home_outlined),
+                  label: const Text('Back to home'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

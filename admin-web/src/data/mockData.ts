@@ -67,6 +67,38 @@ export const mockRooms: MockRoom[] = [
     capacity: 2,
     status: "occupied",
   },
+  {
+    id: "r7",
+    number: "U-301",
+    hostelName: "Unity Hall",
+    floor: 3,
+    capacity: 4,
+    status: "available",
+  },
+  {
+    id: "r8",
+    number: "F-102",
+    hostelName: "Freedom Hall",
+    floor: 1,
+    capacity: 4,
+    status: "available",
+  },
+  {
+    id: "r9",
+    number: "C-215",
+    hostelName: "Commonwealth Hall",
+    floor: 2,
+    capacity: 4,
+    status: "occupied",
+  },
+  {
+    id: "r10",
+    number: "I-404",
+    hostelName: "Independence Hall",
+    floor: 4,
+    capacity: 4,
+    status: "available",
+  },
 ];
 
 export const mockMaintenance: MockMaintenance[] = [
@@ -129,6 +161,10 @@ export const audienceOptions = [
   "Oteng Korankye II Hall",
   "Maathai Hall",
   "Tawiah Hall",
+  "Unity Hall",
+  "Freedom Hall",
+  "Commonwealth Hall",
+  "Independence Hall",
   "Students Only",
   "Staff Only",
 ] as const;

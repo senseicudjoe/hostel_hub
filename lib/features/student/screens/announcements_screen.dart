@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/announcement.dart';
 
@@ -35,6 +36,10 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
     final isAdmin = ref.watch(isAdminProvider);
     final role = ref.watch(userRoleProvider);
     final async = ref.watch(announcementsForRoleProvider(role));
+    final pullHeight = MediaQuery.sizeOf(context).height * 0.55;
+
+    Future<void> onPull() =>
+        ref.refreshProvider(announcementsForRoleProvider(role));
 
     return Scaffold(
       appBar: AppBar(
@@ -74,14 +79,29 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
       body: async.when(
         data: (list) {
           if (list.isEmpty) {
-            return Center(
-              child: Text(
-                'No announcements yet.',
-                style: TextStyle(color: AppColors.textMutedOf(context)),
+            return RefreshIndicator(
+              onRefresh: onPull,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: pullHeight,
+                    child: Center(
+                      child: Text(
+                        'No announcements yet.',
+                        style:
+                            TextStyle(color: AppColors.textMutedOf(context)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
           }
-          return ListView.separated(
+          return RefreshIndicator(
+            onRefresh: onPull,
+            child: ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             itemCount: list.length,
             separatorBuilder: (context, index) => const SizedBox(height: 10),
@@ -103,28 +123,52 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                 },
               );
             },
+            ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
+        loading: () => RefreshIndicator(
+          onRefresh: onPull,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        error: (e, _) => RefreshIndicator(
+          onRefresh: onPull,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.campaign_outlined,
-                  size: 44,
-                  color: AppColors.textHint,
+            children: [
+              SizedBox(
+                height: pullHeight,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.campaign_outlined,
+                      size: 44,
+                      color: AppColors.textHint,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _friendlyError(e),
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(color: AppColors.textMutedOf(context)),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  _friendlyError(e),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textMutedOf(context)),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

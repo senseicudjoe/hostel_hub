@@ -10,7 +10,7 @@ export const COLLECTIONS = {
 export const ROLE_ADMIN = "admin";
 export const ROLE_STUDENT = "student";
 
-/** Ashesi University campus hostel names. */
+/** Hall names (must match Firestore `hostelName` on rooms). */
 export const HOSTEL_NAMES = [
   "Sutherland Hall",
   "Sisulu Hall",
@@ -18,6 +18,10 @@ export const HOSTEL_NAMES = [
   "Oteng Korankye II Hall",
   "Maathai Hall",
   "Tawiah Hall",
+  "Unity Hall",
+  "Freedom Hall",
+  "Commonwealth Hall",
+  "Independence Hall",
 ] as const;
 
 export const ROOM_STATUS = {

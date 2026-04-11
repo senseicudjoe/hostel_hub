@@ -23,6 +23,14 @@ abstract final class HostelAssets {
         return '$_dir/maathai_hall.jpeg';
       case 'Tawiah Hall':
         return '$_dir/tawiah_hall.jpeg';
+      case 'Unity Hall':
+        return '$_dir/unity_hall.jpeg';
+      case 'Freedom Hall':
+        return '$_dir/freedom_hall.jpeg';
+      case 'Commonwealth Hall':
+        return '$_dir/commonwealth_hall.jpeg';
+      case 'Independence Hall':
+        return '$_dir/independence_hall.jpeg';
       default:
         return null;
     }

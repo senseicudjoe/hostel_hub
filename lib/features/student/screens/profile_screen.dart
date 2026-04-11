@@ -1,8 +1,13 @@
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/user_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-11 — Profile & Settings Screen
@@ -16,8 +21,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  // Local notification toggle state (stored per-session; wiring to FCM
-  // topic subscribe/unsubscribe happens here)
   bool _maintenanceNotifs = true;
   bool _announcementNotifs = true;
 
@@ -40,9 +43,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
+      body: RefreshIndicator(
+        onRefresh: () => ref.reloadCurrentUserFromFirestore(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
             // ── Profile Header ───────────────────────────────────
             _ProfileHeader(
               initials: initials,
@@ -52,6 +58,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ? 'SLE Administrator'
                   : '${user?.hostel ?? ''} · Room ${user?.roomNumber ?? ''}',
               isAdmin: isAdmin,
+              profileImageUrl: user?.profileImageUrl,
+              onEditTap: () => _showEditProfileSheet(context),
             ),
 
             const SizedBox(height: 8),
@@ -170,9 +178,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
 
             const SizedBox(height: 32),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  // ── Edit Profile sheet ──────────────────────────────────────────────────────
+
+  Future<void> _showEditProfileSheet(BuildContext context) async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.cardOf(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _EditProfileSheet(user: user),
     );
   }
 
@@ -214,14 +240,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
-  // ── About dialog ────────────────────────────────────────────────────────────
+  // ── About dialog ─────────────────────────────────────────────────────────────
 
   void _showAboutDialog(BuildContext context) {
     showAboutDialog(
@@ -234,14 +259,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // ── Sign Out ─────────────────────────────────────────────────────────────────
+  // ── Sign Out ──────────────────────────────────────────────────────────────────
 
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out of HostelHub?'),
+        content:
+            const Text('Are you sure you want to sign out of HostelHub?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -269,8 +295,215 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 }
 
+/// Owns [TextEditingController] for the sheet so it is disposed only when the
+/// route is removed (avoids "used after disposed" during pop / IME animation).
+class _EditProfileSheet extends ConsumerStatefulWidget {
+  const _EditProfileSheet({required this.user});
+
+  final UserModel user;
+
+  @override
+  ConsumerState<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
+  late final TextEditingController _nameController;
+  File? _pickedFile;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.user.name);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  String get _initials => widget.user.name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((w) => w.isNotEmpty)
+      .take(2)
+      .map((w) => w[0].toUpperCase())
+      .join();
+
+  Future<void> _onSave() async {
+    final newName = _nameController.text.trim();
+    if (newName.isEmpty) return;
+    setState(() => _isSaving = true);
+    final u = widget.user;
+    try {
+      String? newImageUrl;
+      if (_pickedFile != null) {
+        newImageUrl = await ref
+            .read(storageServiceProvider)
+            .uploadProfileImage(u.uid, _pickedFile!);
+      }
+      final updates = <String, dynamic>{
+        'name': newName,
+        if (newImageUrl != null) 'profileImageUrl': newImageUrl,
+      };
+      await ref.read(firestoreServiceProvider).updateUser(u.uid, updates);
+      ref.read(currentUserProvider.notifier).state = u.copyWith(
+        name: newName,
+        profileImageUrl: newImageUrl ?? u.profileImageUrl,
+      );
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final u = widget.user;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 24, 24, bottomInset + 24),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: AppColors.dividerOf(context),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              'Edit Profile',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textOf(context),
+              ),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () async {
+                final file = await ref.read(storageServiceProvider).pickImage();
+                if (file != null) setState(() => _pickedFile = file);
+              },
+              child: Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  CircleAvatar(
+                    radius: 44,
+                    backgroundColor: AppColors.primaryLight,
+                    child: _pickedFile != null
+                        ? ClipOval(
+                            child: Image.file(
+                              _pickedFile!,
+                              width: 88,
+                              height: 88,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : (u.profileImageUrl.isNotEmpty
+                            ? ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: u.profileImageUrl,
+                                  width: 88,
+                                  height: 88,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, _, _) => Text(
+                                    _initials,
+                                    style: const TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                _initials,
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primary,
+                                ),
+                              )),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap to change photo',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textMutedOf(context),
+              ),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: 'Full Name',
+                filled: true,
+                fillColor: AppColors.inputOf(context),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _onSave,
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Save',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Profile Header — theme-aware
+// Profile Header — theme-aware, with edit tap and profile photo support
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ProfileHeader extends StatelessWidget {
@@ -279,6 +512,8 @@ class _ProfileHeader extends StatelessWidget {
   final String email;
   final String tag;
   final bool isAdmin;
+  final String? profileImageUrl;
+  final VoidCallback onEditTap;
 
   const _ProfileHeader({
     required this.initials,
@@ -286,6 +521,8 @@ class _ProfileHeader extends StatelessWidget {
     required this.email,
     required this.tag,
     required this.isAdmin,
+    this.profileImageUrl,
+    required this.onEditTap,
   });
 
   @override
@@ -295,34 +532,58 @@ class _ProfileHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       child: Column(
         children: [
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              CircleAvatar(
-                radius: 44,
-                backgroundColor: AppColors.primaryLight,
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
+          GestureDetector(
+            onTap: onEditTap,
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 44,
+                  backgroundColor: AppColors.primaryLight,
+                  child: (profileImageUrl != null &&
+                          profileImageUrl!.isNotEmpty)
+                      ? ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: profileImageUrl!,
+                            width: 88,
+                            height: 88,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) =>
+                                const CircularProgressIndicator(
+                                    strokeWidth: 2),
+                            errorWidget: (_, __, ___) => Text(
+                              initials,
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Text(
+                          initials,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
                     color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.edit_rounded,
+                    color: Colors.white,
+                    size: 14,
                   ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.edit_rounded,
-                  color: Colors.white,
-                  size: 14,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           Text(
@@ -343,7 +604,8 @@ class _ProfileHeader extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               color: isAdmin
                   ? AppColors.warning.withValues(alpha: 0.1)
@@ -426,8 +688,10 @@ class _ToggleTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Icon(icon, color: AppColors.textMutedOf(context), size: 22),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading:
+          Icon(icon, color: AppColors.textMutedOf(context), size: 22),
       title: Text(
         title,
         style: TextStyle(
@@ -438,7 +702,8 @@ class _ToggleTile extends StatelessWidget {
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(fontSize: 12, color: AppColors.textMutedOf(context)),
+        style: TextStyle(
+            fontSize: 12, color: AppColors.textMutedOf(context)),
       ),
       trailing: Switch(value: value, onChanged: onChanged),
     );
@@ -463,8 +728,10 @@ class _ActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      leading: Icon(icon, color: AppColors.textMutedOf(context), size: 22),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading:
+          Icon(icon, color: AppColors.textMutedOf(context), size: 22),
       title: Text(
         title,
         style: TextStyle(
@@ -482,9 +749,9 @@ class _ActionTile extends StatelessWidget {
                 color: AppColors.textMutedOf(context),
               ),
             ),
-      trailing:
-          trailing ??
-          Icon(Icons.chevron_right, color: AppColors.textMutedOf(context)),
+      trailing: trailing ??
+          Icon(Icons.chevron_right,
+              color: AppColors.textMutedOf(context)),
       onTap: onTap,
     );
   }
