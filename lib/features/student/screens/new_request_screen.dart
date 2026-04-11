@@ -178,8 +178,8 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
           children: [
             // ── Auto-filled Room Info ─────────────────────────
             _RoomInfoBanner(
-              hostel: user?.hostel ?? 'Unity Hall',
-              room: user?.roomNumber ?? 'U-204',
+              hostel: user?.hostel ?? 'Sutherland Hall',
+              room: user?.roomNumber ?? 'S-204',
             ),
 
             const SizedBox(height: 20),

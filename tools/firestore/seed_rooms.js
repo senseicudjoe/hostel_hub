@@ -113,7 +113,6 @@ function validateRoom(room) {
     "capacity",
     "currentOccupants",
     "status",
-    "qrCode",
   ];
   for (const k of required) {
     if (!(k in room)) throw new Error(`Room missing required field: ${k}`);
@@ -139,7 +138,6 @@ function validateRoom(room) {
       `status must be one of: available|occupied|maintenance (got ${room.status})`,
     );
   }
-  if (typeof room.qrCode !== "string") throw new Error("qrCode must be a string");
 }
 
 async function main() {

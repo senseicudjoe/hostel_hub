@@ -14,8 +14,11 @@ export interface MaintenanceRow {
   requestId: string;
   studentUid: string;
   title: string;
+  description: string;
   category: string;
   status: string;
   assignedTo: string;
+  hostelName: string;
+  roomNumber: string;
   createdAt: Date;
 }

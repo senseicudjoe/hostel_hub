@@ -38,10 +38,13 @@ class AppConstants {
   static const String profileImagesPath     = 'profile_images';
   static const String maintenanceImagesPath = 'maintenance_images';
 
-  // Hostels
+  // Ashesi University campus hostels
   static const List<String> hostels = [
-    'Unity Hall',
-    'Freedom Hall',
-    'Independence Hall',
+    'Sutherland Hall',
+    'Sisulu Hall',
+    'Amu Hall',
+    'Oteng Korankye II Hall',
+    'Maathai Hall',
+    'Tawiah Hall',
   ];
 }
