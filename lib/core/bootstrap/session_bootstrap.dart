@@ -1,8 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:local_auth/local_auth.dart';
-
 import '../../models/user_model.dart';
 import '../providers/app_providers.dart';
 
@@ -45,29 +43,23 @@ class _SessionBootstrapState extends ConsumerState<SessionBootstrap> {
     }
 
     // ── Hydrate session ─────────────────────────────────────────
-    final profile =
-        await ref.read(firestoreServiceProvider).getUser(authUser.uid);
+    final profile = await ref
+        .read(firestoreServiceProvider)
+        .getUser(authUser.uid);
     if (!mounted || profile == null) return;
     ref.read(currentUserProvider.notifier).state = profile;
     await _syncNotifications(profile);
   }
 
   Future<bool> _promptBiometric() async {
-    try {
-      final auth = LocalAuthentication();
-      final canCheck = await auth.canCheckBiometrics;
-      final isSupported = await auth.isDeviceSupported();
-      if (!canCheck && !isSupported) return true; // Device can't do biometrics — skip gate
-      return await auth.authenticate(
-        localizedReason: 'Verify your identity to access HostelHub',
-        options: const AuthenticationOptions(
-          biometricOnly: false, // Allow PIN/pattern as fallback
-          stickyAuth: true,
-        ),
-      );
-    } catch (_) {
-      return true; // On any error, fall through to normal flow
-    }
+    final status = await ref.read(biometricAuthServiceProvider).getStatus();
+    if (!status.isSupported) return true;
+
+    return ref
+        .read(biometricAuthServiceProvider)
+        .authenticate(
+          localizedReason: 'Verify your identity to access HostelHub',
+        );
   }
 
   Future<void> _syncNotifications(UserModel user) async {

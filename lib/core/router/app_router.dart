@@ -9,6 +9,7 @@ import '../providers/app_providers.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/onboarding_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/biometric_settings_screen.dart';
 import '../../features/auth/screens/email_verification_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/student/screens/student_shell_screen.dart';
@@ -95,6 +96,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               loc.startsWith('/room') ||
               (loc.startsWith('/maintenance') && !loc.startsWith('/admin')) ||
               loc == '/profile' ||
+              loc.startsWith('/profile/') ||
               loc == '/home/announcements';
           if (onStudentShell) {
             return loc == '/home/announcements'
@@ -222,6 +224,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/profile',
                 builder: (context, state) => const ProfileScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'biometrics',
+                    builder: (context, state) =>
+                        const BiometricSettingsScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -301,6 +310,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/admin/profile',
                 builder: (context, state) => const ProfileScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'biometrics',
+                    builder: (context, state) =>
+                        const BiometricSettingsScreen(),
+                  ),
+                ],
               ),
             ],
           ),

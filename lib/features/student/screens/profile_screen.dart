@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:local_auth/local_auth.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -102,12 +101,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ref.read(themeModeProvider.notifier).setDarkMode(v),
                 ),
                 const Divider(height: 1),
-                _ToggleTile(
+                _ActionTile(
                   icon: Icons.fingerprint_rounded,
                   title: 'Biometric Login',
-                  subtitle: 'Use fingerprint or Face ID to unlock the app',
-                  value: biometricEnabled,
-                  onChanged: (v) => _toggleBiometric(context, v),
+                  subtitle: biometricEnabled
+                      ? 'Configured on this device'
+                      : 'Set up fingerprint or screen lock sign-in',
+                  trailing: Text(
+                    biometricEnabled ? 'On' : 'Off',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  onTap: () => context.push(
+                    isAdmin
+                        ? '/admin/profile/biometrics'
+                        : '/profile/biometrics',
+                  ),
                 ),
               ],
             ),
@@ -162,47 +174,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ),
     );
-  }
-
-  // ── Biometric toggle ────────────────────────────────────────────────────────
-
-  Future<void> _toggleBiometric(BuildContext context, bool enable) async {
-    if (enable) {
-      // Verify the device actually supports biometrics before enabling
-      try {
-        final auth = LocalAuthentication();
-        final canCheck = await auth.canCheckBiometrics;
-        final isSupported = await auth.isDeviceSupported();
-        if (!canCheck && !isSupported) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Biometric authentication is not available on this device.',
-                ),
-              ),
-            );
-          }
-          return;
-        }
-        // Do a test authenticate to confirm enrolment
-        final confirmed = await auth.authenticate(
-          localizedReason: 'Confirm your biometric to enable this feature',
-          options: const AuthenticationOptions(stickyAuth: true),
-        );
-        if (!confirmed) return;
-      } catch (_) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not verify biometrics. Please try again.'),
-            ),
-          );
-        }
-        return;
-      }
-    }
-    ref.read(biometricEnabledProvider.notifier).setEnabled(enable);
   }
 
   // ── Change Password dialog ──────────────────────────────────────────────────
@@ -477,12 +448,14 @@ class _ToggleTile extends StatelessWidget {
 class _ActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
+  final String? subtitle;
   final VoidCallback onTap;
   final Widget? trailing;
 
   const _ActionTile({
     required this.icon,
     required this.title,
+    this.subtitle,
     required this.onTap,
     this.trailing,
   });
@@ -500,6 +473,15 @@ class _ActionTile extends StatelessWidget {
           color: AppColors.textOf(context),
         ),
       ),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textMutedOf(context),
+              ),
+            ),
       trailing:
           trailing ??
           Icon(Icons.chevron_right, color: AppColors.textMutedOf(context)),

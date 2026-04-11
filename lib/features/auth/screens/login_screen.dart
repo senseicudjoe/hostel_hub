@@ -10,7 +10,8 @@ import '../../../core/theme/app_theme.dart';
 //
 // Supports:
 //  • Email + password login (Firebase Auth)
-//  • Biometric button (UI only — shows a SnackBar, needs local_auth package)
+//  • Google sign-in
+//  • Device biometric sign-in after opt-in from settings
 // ─────────────────────────────────────────────────────────────────────────────
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -27,13 +28,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isBiometricLoading = false;
+  bool _biometricReady = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshBiometricState();
+    });
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshBiometricState() async {
+    final enabled = ref.read(biometricEnabledProvider);
+    final hasCredentials = await ref
+        .read(biometricAuthServiceProvider)
+        .hasStoredCredentials();
+
+    if (!mounted) return;
+    setState(() {
+      _biometricReady = enabled && hasCredentials;
+    });
   }
 
   // ── Real Firebase login ───────────────────────────────────────────────────
@@ -127,6 +150,77 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> _signInWithBiometrics() async {
+    if (!_biometricReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enable biometric sign-in from Profile > Biometric Login first.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isBiometricLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final authenticated = await ref
+          .read(biometricAuthServiceProvider)
+          .authenticate(
+            localizedReason:
+                'Use your device biometrics to sign in to HostelHub',
+          );
+
+      if (!authenticated) return;
+
+      final user = await ref
+          .read(biometricAuthServiceProvider)
+          .signInWithStoredCredentials(ref.read(authServiceProvider));
+
+      if (!mounted) return;
+
+      if (user == null) {
+        setState(
+          () => _errorMessage =
+              'Biometric login is not configured for this device. Sign in with your password and enable it again from settings.',
+        );
+        return;
+      }
+
+      ref.read(currentUserProvider.notifier).state = user;
+      if (user.role == AppConstants.roleAdmin) {
+        context.go('/admin');
+      } else {
+        context.go('/home');
+      }
+    } catch (e) {
+      final message = e.toString();
+      if (message == 'Incorrect email or password.' ||
+          message == 'No account found with this email.') {
+        await ref.read(biometricAuthServiceProvider).clearCredentials();
+        ref.read(biometricEnabledProvider.notifier).setEnabled(false);
+        await _refreshBiometricState();
+        if (!mounted) return;
+        setState(
+          () => _errorMessage =
+              'Saved biometric sign-in is out of date. Sign in with your password and enable biometrics again in settings.',
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() => _errorMessage = message);
+    } finally {
+      if (mounted) {
+        setState(() => _isBiometricLoading = false);
       }
     }
   }
@@ -291,7 +385,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     // Sign In button
                     ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
+                      onPressed: _isLoading || _isBiometricLoading
+                          ? null
+                          : _login,
                       child: _isLoading
                           ? const SizedBox(
                               width: 22,
@@ -333,24 +429,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               // ── Google Sign-In ────────────────────────────────
               _GoogleSignInButton(
-                onPressed: _isLoading ? null : _signInWithGoogle,
+                onPressed: _isLoading || _isBiometricLoading
+                    ? null
+                    : _signInWithGoogle,
               ),
 
               const SizedBox(height: 12),
 
               // ── Biometric button ──────────────────────────────
               OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Biometric login available after first sign-in',
-                      ),
-                    ),
-                  );
-                },
+                onPressed: _isLoading || _isBiometricLoading
+                    ? null
+                    : _signInWithBiometrics,
                 icon: const Icon(Icons.fingerprint),
-                label: const Text('Use Biometrics'),
+                label: Text(
+                  _isBiometricLoading
+                      ? 'Checking biometrics...'
+                      : 'Use Biometrics',
+                ),
               ),
 
               const SizedBox(height: 24),
