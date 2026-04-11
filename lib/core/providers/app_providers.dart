@@ -8,6 +8,7 @@ import '../../models/maintenance_request.dart';
 import '../../models/room_model.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/biometric_auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/offline_service.dart';
@@ -19,6 +20,9 @@ import '../constants/app_constants.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 final authServiceProvider = Provider<AuthService>((_) => AuthService());
+final biometricAuthServiceProvider = Provider<BiometricAuthService>(
+  (_) => BiometricAuthService(),
+);
 final firestoreServiceProvider = Provider<FirestoreService>(
   (_) => FirestoreService(),
 );
@@ -37,6 +41,12 @@ final offlineServiceProvider = Provider<OfflineService>(
 // ─────────────────────────────────────────────────────────────────────────────
 
 final currentUserProvider = StateProvider<UserModel?>((ref) => null);
+
+/// Flips to true once SessionBootstrap finishes — whether it found a session,
+/// completed biometrics, or determined no user is signed in.
+/// The splash screen waits for this before navigating so it never races
+/// against an in-progress biometric prompt or Firestore fetch.
+final sessionBootstrapDoneProvider = StateProvider<bool>((ref) => false);
 
 final userRoleProvider = Provider<String>((ref) {
   return ref.watch(currentUserProvider)?.role ?? AppConstants.roleStudent;

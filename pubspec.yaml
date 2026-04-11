@@ -47,6 +47,7 @@ dependencies:
 
   # Biometric authentication
   local_auth: ^2.3.0
+  flutter_secure_storage: ^9.2.4
 
   # Image Picking
   image_picker: ^1.1.0

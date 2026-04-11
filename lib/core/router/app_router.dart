@@ -9,8 +9,10 @@ import '../providers/app_providers.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/onboarding_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/biometric_settings_screen.dart';
 import '../../features/auth/screens/email_verification_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
+import '../../features/auth/screens/student_setup_screen.dart';
 import '../../features/student/screens/student_shell_screen.dart';
 import '../../features/student/screens/student_dashboard_screen.dart';
 import '../../features/student/screens/explore_rooms_screen.dart';
@@ -81,6 +83,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (loc == '/verify-email') {
           return isAdmin ? '/admin' : '/home';
         }
+
+        // ── Profile setup gate ─────────────────────────────────────────────
+        // New students must complete the setup flow (profile info + room
+        // selection) before reaching the dashboard.
+        if (!isAdmin && !user.setupComplete) {
+          return loc == '/setup' ? null : '/setup';
+        }
+        if (loc == '/setup') {
+          return isAdmin ? '/admin' : '/home';
+        }
         // ──────────────────────────────────────────────────────────────────
 
         if (loc == '/splash' || loc == '/onboarding') {
@@ -95,6 +107,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               loc.startsWith('/room') ||
               (loc.startsWith('/maintenance') && !loc.startsWith('/admin')) ||
               loc == '/profile' ||
+              loc.startsWith('/profile/') ||
               loc == '/home/announcements';
           if (onStudentShell) {
             return loc == '/home/announcements'
@@ -112,7 +125,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           loc == '/onboarding' ||
           loc == '/login' ||
           loc == '/register' ||
-          loc == '/verify-email';
+          loc == '/verify-email' ||
+          loc == '/setup';
       if (!authPublic) return '/login';
       return null;
     },
@@ -134,6 +148,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/setup',
+        builder: (context, state) => const StudentSetupScreen(),
       ),
 
       // ── Student Shell ─────────────────────────────────────────────────────
@@ -222,6 +240,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/profile',
                 builder: (context, state) => const ProfileScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'biometrics',
+                    builder: (context, state) =>
+                        const BiometricSettingsScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -301,6 +326,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/admin/profile',
                 builder: (context, state) => const ProfileScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'biometrics',
+                    builder: (context, state) =>
+                        const BiometricSettingsScreen(),
+                  ),
+                ],
               ),
             ],
           ),

@@ -1,14 +1,16 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hive/hive.dart';
 import '../core/constants/app_constants.dart';
 
 // ── Background handler (top-level required by FCM) ────────────
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Firebase is already initialised by the time this runs
-  print('📩 Background message: ${message.notification?.title}');
+  debugPrint('📩 Background message: ${message.notification?.title}');
 }
 
 class NotificationService {
@@ -113,5 +115,46 @@ class NotificationService {
     await _fcm.unsubscribeFromTopic(AppConstants.topicAll);
     await _fcm.unsubscribeFromTopic(AppConstants.topicStudents);
     await _fcm.unsubscribeFromTopic(AppConstants.topicStaff);
+  }
+
+  // ── Welcome notification ──────────────────────────────────
+  /// Fires a local "Welcome to HostelHub" notification 5 seconds after
+  /// the first ever successful sign-in.  Uses Hive to make sure it only
+  /// fires once per device, even if the user signs out and back in.
+  Future<void> showWelcomeNotificationIfNeeded(String userName) async {
+    try {
+      final box = Hive.box(AppConstants.settingsBox);
+      final alreadySent = box.get('welcomeNotifSent', defaultValue: false) as bool;
+      if (alreadySent) return;
+
+      // Mark immediately so a double-call (e.g. hot-restart during dev) won't
+      // fire it twice.
+      await box.put('welcomeNotifSent', true);
+
+      await Future.delayed(const Duration(seconds: 5));
+
+      final firstName = userName.split(' ').first;
+
+      await _local.show(
+        99901, // fixed ID so it won't duplicate
+        'Welcome to HostelHub, $firstName! 🏠',
+        'Your smart hostel companion is ready. '
+            'Browse rooms, track maintenance requests, and stay connected '
+            'with Ashesi announcements — all from one place.',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+            styleInformation: BigTextStyleInformation(''),
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+      );
+    } catch (_) {
+      // Notification failure is non-critical — swallow silently.
+    }
   }
 }
