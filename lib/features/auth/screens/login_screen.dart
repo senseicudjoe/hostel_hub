@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,9 +10,6 @@ import '../../../core/theme/app_theme.dart';
 //
 // Supports:
 //  • Email + password login (Firebase Auth)
-//  • Debug-only demo shortcuts: Demo Student / Demo Admin
-//    → These set a fake user in the provider and skip Firebase entirely.
-//      Perfect for exploring all screens without a real account.
 //  • Biometric button (UI only — shows a SnackBar, needs local_auth package)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -106,14 +102,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  void _loginAsDemoUser(String role) {
-    final user = role == AppConstants.roleAdmin
-        ? DemoUsers.admin
-        : DemoUsers.student;
-    ref.read(currentUserProvider.notifier).state = user;
-    context.go(role == AppConstants.roleAdmin ? '/admin' : '/home');
   }
 
   Future<void> _forgotPassword(BuildContext context) async {
@@ -347,31 +335,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               _GoogleSignInButton(
                 onPressed: _isLoading ? null : _signInWithGoogle,
               ),
-
-              if (kDebugMode) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () => _loginAsDemoUser(AppConstants.roleStudent),
-                        child: const Text('Demo Student'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () => _loginAsDemoUser(AppConstants.roleAdmin),
-                        child: const Text('Demo Admin'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
 
               const SizedBox(height: 12),
 

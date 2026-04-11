@@ -30,7 +30,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final biometricEnabled = ref.watch(biometricEnabledProvider);
     final isDark = themeMode == ThemeMode.dark;
 
-    final initials = user?.name
+    final initials =
+        user?.name
             .trim()
             .split(' ')
             .take(2)
@@ -58,78 +59,85 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             // ── Notifications ────────────────────────────────────
             _SectionHeader(title: 'Notifications'),
-            _SettingsCard(children: [
-              _ToggleTile(
-                icon: Icons.build_outlined,
-                title: 'Maintenance Updates',
-                subtitle: 'Get notified when your request status changes',
-                value: _maintenanceNotifs,
-                onChanged: (v) {
-                  setState(() => _maintenanceNotifs = v);
-                  final ns = ref.read(notificationServiceProvider);
-                  if (v) {
-                    ns.subscribeToRole(
-                        ref.read(userRoleProvider));
-                  } else {
-                    ns.unsubscribeAll();
-                  }
-                },
-              ),
-              const Divider(height: 1),
-              _ToggleTile(
-                icon: Icons.campaign_outlined,
-                title: 'Announcements',
-                subtitle: 'Important notices from SLE',
-                value: _announcementNotifs,
-                onChanged: (v) => setState(() => _announcementNotifs = v),
-              ),
-            ]),
+            _SettingsCard(
+              children: [
+                _ToggleTile(
+                  icon: Icons.build_outlined,
+                  title: 'Maintenance Updates',
+                  subtitle: 'Get notified when your request status changes',
+                  value: _maintenanceNotifs,
+                  onChanged: (v) {
+                    setState(() => _maintenanceNotifs = v);
+                    final ns = ref.read(notificationServiceProvider);
+                    if (v) {
+                      ns.subscribeToRole(ref.read(userRoleProvider));
+                    } else {
+                      ns.unsubscribeAll();
+                    }
+                  },
+                ),
+                const Divider(height: 1),
+                _ToggleTile(
+                  icon: Icons.campaign_outlined,
+                  title: 'Announcements',
+                  subtitle: 'Important notices from SLE',
+                  value: _announcementNotifs,
+                  onChanged: (v) => setState(() => _announcementNotifs = v),
+                ),
+              ],
+            ),
 
             const SizedBox(height: 8),
 
             // ── Preferences ──────────────────────────────────────
             _SectionHeader(title: 'Preferences'),
-            _SettingsCard(children: [
-              _ToggleTile(
-                icon: Icons.dark_mode_outlined,
-                title: 'Dark Mode',
-                subtitle: 'Use dark theme throughout the app',
-                value: isDark,
-                onChanged: (v) =>
-                    ref.read(themeModeProvider.notifier).setDarkMode(v),
-              ),
-              const Divider(height: 1),
-              _ToggleTile(
-                icon: Icons.fingerprint_rounded,
-                title: 'Biometric Login',
-                subtitle: 'Use fingerprint or Face ID to unlock the app',
-                value: biometricEnabled,
-                onChanged: (v) => _toggleBiometric(context, v),
-              ),
-            ]),
+            _SettingsCard(
+              children: [
+                _ToggleTile(
+                  icon: Icons.dark_mode_outlined,
+                  title: 'Dark Mode',
+                  subtitle: 'Use dark theme throughout the app',
+                  value: isDark,
+                  onChanged: (v) =>
+                      ref.read(themeModeProvider.notifier).setDarkMode(v),
+                ),
+                const Divider(height: 1),
+                _ToggleTile(
+                  icon: Icons.fingerprint_rounded,
+                  title: 'Biometric Login',
+                  subtitle: 'Use fingerprint or Face ID to unlock the app',
+                  value: biometricEnabled,
+                  onChanged: (v) => _toggleBiometric(context, v),
+                ),
+              ],
+            ),
 
             const SizedBox(height: 8),
 
             // ── Account ──────────────────────────────────────────
             _SectionHeader(title: 'Account'),
-            _SettingsCard(children: [
-              _ActionTile(
-                icon: Icons.lock_reset_rounded,
-                title: 'Change Password',
-                onTap: () => _showChangePasswordDialog(context),
-              ),
-              const Divider(height: 1),
-              _ActionTile(
-                icon: Icons.info_outline,
-                title: 'About HostelHub',
-                trailing: const Text(
-                  'v1.0.0',
-                  style: TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
+            _SettingsCard(
+              children: [
+                _ActionTile(
+                  icon: Icons.lock_reset_rounded,
+                  title: 'Change Password',
+                  onTap: () => _showChangePasswordDialog(context),
                 ),
-                onTap: () => _showAboutDialog(context),
-              ),
-            ]),
+                const Divider(height: 1),
+                _ActionTile(
+                  icon: Icons.info_outline,
+                  title: 'About HostelHub',
+                  trailing: const Text(
+                    'v1.0.0',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  onTap: () => _showAboutDialog(context),
+                ),
+              ],
+            ),
 
             const SizedBox(height: 16),
 
@@ -140,7 +148,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.error,
                   side: BorderSide(
-                      color: AppColors.error.withValues(alpha: 0.4)),
+                    color: AppColors.error.withValues(alpha: 0.4),
+                  ),
                 ),
                 onPressed: () => _confirmSignOut(context, ref),
                 icon: const Icon(Icons.logout_rounded),
@@ -169,7 +178,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                    'Biometric authentication is not available on this device.'),
+                  'Biometric authentication is not available on this device.',
+                ),
               ),
             );
           }
@@ -201,24 +211,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = ref.read(currentUserProvider);
     if (user == null) return;
 
-    // For demo users there is no Firebase session — send reset via email flow
-    final isDemoUser =
-        user.uid == 'demo_student_001' || user.uid == 'demo_admin_001';
-    if (isDemoUser) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Demo accounts cannot change passwords.')),
-      );
-      return;
-    }
-
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Change Password'),
-        content: Text(
-          'A password reset link will be sent to\n${user.email}',
-        ),
+        content: Text('A password reset link will be sent to\n${user.email}'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -246,9 +243,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -273,16 +270,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Sign Out'),
-        content:
-            const Text('Are you sure you want to sign out of HostelHub?'),
+        content: const Text('Are you sure you want to sign out of HostelHub?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Sign Out'),
           ),
@@ -350,8 +345,11 @@ class _ProfileHeader extends StatelessWidget {
                   color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.edit_rounded,
-                    color: Colors.white, size: 14),
+                child: const Icon(
+                  Icons.edit_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
               ),
             ],
           ),
@@ -457,8 +455,7 @@ class _ToggleTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Icon(icon, color: AppColors.textMutedOf(context), size: 22),
       title: Text(
         title,
@@ -470,10 +467,7 @@ class _ToggleTile extends StatelessWidget {
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(
-          fontSize: 12,
-          color: AppColors.textMutedOf(context),
-        ),
+        style: TextStyle(fontSize: 12, color: AppColors.textMutedOf(context)),
       ),
       trailing: Switch(value: value, onChanged: onChanged),
     );
@@ -496,8 +490,7 @@ class _ActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       leading: Icon(icon, color: AppColors.textMutedOf(context), size: 22),
       title: Text(
         title,
@@ -507,7 +500,8 @@ class _ActionTile extends StatelessWidget {
           color: AppColors.textOf(context),
         ),
       ),
-      trailing: trailing ??
+      trailing:
+          trailing ??
           Icon(Icons.chevron_right, color: AppColors.textMutedOf(context)),
       onTap: onTap,
     );

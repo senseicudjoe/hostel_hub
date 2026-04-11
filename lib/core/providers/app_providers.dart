@@ -19,13 +19,18 @@ import '../constants/app_constants.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 final authServiceProvider = Provider<AuthService>((_) => AuthService());
-final firestoreServiceProvider =
-    Provider<FirestoreService>((_) => FirestoreService());
-final storageServiceProvider = Provider<StorageService>((_) => StorageService());
-final notificationServiceProvider =
-    Provider<NotificationService>((_) => NotificationService());
-final offlineServiceProvider =
-    Provider<OfflineService>((_) => OfflineService());
+final firestoreServiceProvider = Provider<FirestoreService>(
+  (_) => FirestoreService(),
+);
+final storageServiceProvider = Provider<StorageService>(
+  (_) => StorageService(),
+);
+final notificationServiceProvider = Provider<NotificationService>(
+  (_) => NotificationService(),
+);
+final offlineServiceProvider = Provider<OfflineService>(
+  (_) => OfflineService(),
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SESSION USER
@@ -75,8 +80,7 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   }
 }
 
-final themeModeProvider =
-    StateNotifierProvider<ThemeModeNotifier, ThemeMode>(
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>(
   (_) => ThemeModeNotifier(),
 );
 
@@ -89,8 +93,10 @@ class BiometricNotifier extends StateNotifier<bool> {
 
   static bool _load() {
     try {
-      return Hive.box(AppConstants.settingsBox)
-          .get('biometricEnabled', defaultValue: false) as bool;
+      return Hive.box(
+            AppConstants.settingsBox,
+          ).get('biometricEnabled', defaultValue: false)
+          as bool;
     } catch (_) {
       return false;
     }
@@ -104,8 +110,7 @@ class BiometricNotifier extends StateNotifier<bool> {
   }
 }
 
-final biometricEnabledProvider =
-    StateNotifierProvider<BiometricNotifier, bool>(
+final biometricEnabledProvider = StateNotifierProvider<BiometricNotifier, bool>(
   (_) => BiometricNotifier(),
 );
 
@@ -115,27 +120,30 @@ final biometricEnabledProvider =
 
 final studentMaintenanceRequestsProvider =
     StreamProvider<List<MaintenanceRequest>>((ref) {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return const Stream.empty();
-  return ref
-      .read(firestoreServiceProvider)
-      .getStudentMaintenanceRequests(user.uid);
-});
+      final user = ref.watch(currentUserProvider);
+      if (user == null) return const Stream.empty();
+      return ref
+          .read(firestoreServiceProvider)
+          .getStudentMaintenanceRequests(user.uid);
+    });
 
-final allMaintenanceRequestsProvider =
-    StreamProvider<List<MaintenanceRequest>>((ref) {
-  return ref.read(firestoreServiceProvider).getAllMaintenanceRequests();
-});
+final allMaintenanceRequestsProvider = StreamProvider<List<MaintenanceRequest>>(
+  (ref) {
+    return ref.read(firestoreServiceProvider).getAllMaintenanceRequests();
+  },
+);
 
 final maintenanceRequestProvider =
     StreamProvider.family<MaintenanceRequest?, String>((ref, requestId) {
-  return ref.read(firestoreServiceProvider).watchMaintenanceRequest(requestId);
-});
+      return ref
+          .read(firestoreServiceProvider)
+          .watchMaintenanceRequest(requestId);
+    });
 
 final announcementsForRoleProvider =
     StreamProvider.family<List<Announcement>, String>((ref, role) {
-  return ref.read(firestoreServiceProvider).getAnnouncements(role);
-});
+      return ref.read(firestoreServiceProvider).getAnnouncements(role);
+    });
 
 final roomsProvider = StreamProvider<List<RoomModel>>((ref) {
   return ref.read(firestoreServiceProvider).getRooms();
@@ -166,33 +174,3 @@ final roommatesProvider = StreamProvider<List<UserModel>>((ref) {
       .read(firestoreServiceProvider)
       .getRoommates(user.hostel, user.roomNumber, user.uid);
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DEMO USERS
-// ─────────────────────────────────────────────────────────────────────────────
-
-class DemoUsers {
-  static UserModel get student => UserModel(
-        uid: 'demo_student_001',
-        name: 'Kofi Mensah',
-        email: 'kofi.mensah@ashesi.edu.gh',
-        role: AppConstants.roleStudent,
-        hostel: 'Sutherland Hall',
-        roomNumber: 'S-204',
-        profileImageUrl: '',
-        fcmToken: '',
-        createdAt: DateTime.now(),
-      );
-
-  static UserModel get admin => UserModel(
-        uid: 'demo_admin_001',
-        name: 'Ama Boateng',
-        email: 'ama.boateng@ashesi.edu.gh',
-        role: AppConstants.roleAdmin,
-        hostel: '',
-        roomNumber: '',
-        profileImageUrl: '',
-        fcmToken: '',
-        createdAt: DateTime.now(),
-      );
-}

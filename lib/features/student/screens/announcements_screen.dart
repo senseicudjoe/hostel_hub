@@ -130,7 +130,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
       ),
       floatingActionButton: isAdmin
           ? FloatingActionButton.extended(
-              onPressed: () => context.go('/admin/announcements/compose'),
+              onPressed: () => context.push('/admin/announcements/compose'),
               icon: const Icon(Icons.add),
               label: const Text('Compose'),
             )

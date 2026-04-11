@@ -26,7 +26,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 // Three things happen before the UI appears:
 //   1. WidgetsFlutterBinding.ensureInitialized() — needed before async calls
 //   2. Hive opens its boxes for offline caching
-//   3. Firebase initialises (try-catch so demo mode works without Firebase)
+//   3. Firebase initialises before the UI appears
 // ─────────────────────────────────────────────────────────────────────────────
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,24 +36,18 @@ void main() async {
   await OfflineService.init();
 
   // ── Firebase ─────────────────────────────────────────────
-  // If Firebase isn't set up for the current platform this throws —
-  // we catch it and let the app continue in demo mode.
+  // If Firebase isn't set up for the current platform this throws.
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    FirebaseMessaging.onBackgroundMessage(
-        _firebaseMessagingBackgroundHandler);
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   } catch (e) {
-    debugPrint('⚠️  Firebase init skipped (demo mode active): $e');
+    debugPrint('⚠️  Firebase init failed: $e');
   }
 
   // ── Run the app inside ProviderScope ─────────────────────
   // ProviderScope is the root of the Riverpod state tree.
   // Every ConsumerWidget can now call ref.watch() / ref.read().
-  runApp(
-    const ProviderScope(
-      child: HostelHubApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: HostelHubApp()));
 }

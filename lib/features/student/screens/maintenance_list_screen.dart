@@ -38,10 +38,7 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
     super.dispose();
   }
 
-  List<MaintenanceRequest> _filter(
-    List<MaintenanceRequest> all,
-    int tabIndex,
-  ) {
+  List<MaintenanceRequest> _filter(List<MaintenanceRequest> all, int tabIndex) {
     if (tabIndex == 0) return all;
     const want = ['pending', 'in_progress', 'resolved'];
     final s = want[tabIndex - 1];
@@ -53,9 +50,7 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
     final async = ref.watch(studentMaintenanceRequestsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Maintenance'),
-      ),
+      appBar: AppBar(title: const Text('Maintenance')),
       body: Column(
         children: [
           // Tab bar strip — sits below the AppBar
@@ -81,8 +76,7 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
                   return _RequestList(requests: filtered);
                 }),
               ),
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
@@ -98,7 +92,7 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go('/maintenance/new'),
+        onPressed: () => context.push('/maintenance/new'),
         icon: const Icon(Icons.add),
         label: const Text('New Request'),
       ),
@@ -117,11 +111,18 @@ class _RequestList extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.inbox_outlined, size: 56, color: AppColors.textHint),
+            const Icon(
+              Icons.inbox_outlined,
+              size: 56,
+              color: AppColors.textHint,
+            ),
             const SizedBox(height: 12),
             Text(
               'No requests here',
-              style: TextStyle(color: AppColors.textMutedOf(context), fontSize: 15),
+              style: TextStyle(
+                color: AppColors.textMutedOf(context),
+                fontSize: 15,
+              ),
             ),
           ],
         ),
@@ -131,7 +132,7 @@ class _RequestList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: requests.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         return _RequestCard(request: requests[index]);
       },
@@ -147,12 +148,10 @@ class _RequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final categoryIcon = _categoryIcon(request.category);
     final dateStr = DateFormat('MMM d, y').format(request.createdAt);
-    final roomLabel = request.roomNumber.isNotEmpty
-        ? request.roomNumber
-        : '—';
+    final roomLabel = request.roomNumber.isNotEmpty ? request.roomNumber : '—';
 
     return GestureDetector(
-      onTap: () => context.go('/maintenance/${request.requestId}'),
+      onTap: () => context.push('/maintenance/${request.requestId}'),
       child: Card(
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -205,8 +204,11 @@ class _RequestCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(Icons.meeting_room_outlined,
-                            size: 13, color: AppColors.textMutedOf(context)),
+                        Icon(
+                          Icons.meeting_room_outlined,
+                          size: 13,
+                          color: AppColors.textMutedOf(context),
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           roomLabel,
@@ -216,8 +218,11 @@ class _RequestCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Icon(Icons.calendar_today_outlined,
-                            size: 13, color: AppColors.textMutedOf(context)),
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 13,
+                          color: AppColors.textMutedOf(context),
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           dateStr,

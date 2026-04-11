@@ -109,7 +109,7 @@ class _StudentDashboardScreenState
                     ),
                   ],
                 ),
-                onPressed: () => context.go('/home/announcements'),
+                onPressed: () => context.push('/announcements'),
               ),
             ],
           ),
@@ -150,7 +150,7 @@ class _StudentDashboardScreenState
                       ),
                     ),
                     TextButton(
-                      onPressed: () => context.go('/home/announcements'),
+                      onPressed: () => context.push('/announcements'),
                       child: const Text('See all'),
                     ),
                   ],
@@ -392,7 +392,7 @@ class _QuickActionGrid extends StatelessWidget {
           icon: Icons.build_rounded,
           label: 'Report\nIssue',
           color: const Color(0xFFA53A3E),
-          onTap: () => context.go('/maintenance/new'),
+          onTap: () => context.push('/maintenance/new'),
         ),
         _QuickActionTile(
           icon: Icons.meeting_room_rounded,
@@ -410,7 +410,7 @@ class _QuickActionGrid extends StatelessWidget {
           icon: Icons.campaign_rounded,
           label: 'Announce-\nments',
           color: const Color(0xFF6A1B9A),
-          onTap: () => context.go('/home/announcements'),
+          onTap: () => context.push('/announcements'),
         ),
       ],
     );
