@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../core/constants/app_constants.dart';
 import '../models/user_model.dart';
 
 class AuthService {
@@ -32,6 +34,7 @@ class AuthService {
       );
 
       await _db.collection('users').doc(user.uid).set(user.toMap());
+      await credential.user!.sendEmailVerification();
       return user;
     } on FirebaseAuthException catch (e) {
       throw _handleError(e);
@@ -71,6 +74,50 @@ class AuthService {
     final doc = await _db.collection('users').doc(uid).get();
     if (doc.exists) return UserModel.fromMap(doc.data()!);
     return null;
+  }
+
+  // ── Google Sign-In ───────────────────────────────────────
+  Future<UserModel?> signInWithGoogle() async {
+    try {
+      final googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return null; // user cancelled
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      final firebaseUser = userCredential.user!;
+
+      // Existing user — load their profile
+      final doc = await _db.collection('users').doc(firebaseUser.uid).get();
+      if (doc.exists) return UserModel.fromMap(doc.data()!);
+
+      // First-time Google sign-in — create a student profile automatically
+      final user = UserModel(
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName ?? 'Student',
+        email: firebaseUser.email ?? googleUser.email,
+        role: AppConstants.roleStudent,
+        createdAt: DateTime.now(),
+      );
+      await _db.collection('users').doc(user.uid).set(user.toMap());
+      return user;
+    } on FirebaseAuthException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ── Email verification ───────────────────────────────────
+  Future<void> sendEmailVerification() async {
+    await _auth.currentUser?.sendEmailVerification();
+  }
+
+  Future<bool> reloadAndCheckVerified() async {
+    await _auth.currentUser?.reload();
+    return _auth.currentUser?.emailVerified ?? false;
   }
 
   // ── Password reset ───────────────────────────────────────

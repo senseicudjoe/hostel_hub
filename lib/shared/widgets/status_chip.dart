@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 
 /// A colour-coded chip that displays the status of a maintenance request
-/// or shuttle booking.
+///.
 ///
 /// Usage:
 ///   StatusChip(status: 'in_progress')

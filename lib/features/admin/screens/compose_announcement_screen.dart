@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/announcement.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-15 — Compose Announcement
@@ -13,16 +18,16 @@ import '../../../core/theme/app_theme.dart';
 // Fields: Title, Body, Audience selector, Optional image, Schedule/Send now
 // ─────────────────────────────────────────────────────────────────────────────
 
-class ComposeAnnouncementScreen extends StatefulWidget {
+class ComposeAnnouncementScreen extends ConsumerStatefulWidget {
   const ComposeAnnouncementScreen({super.key});
 
   @override
-  State<ComposeAnnouncementScreen> createState() =>
+  ConsumerState<ComposeAnnouncementScreen> createState() =>
       _ComposeAnnouncementScreenState();
 }
 
 class _ComposeAnnouncementScreenState
-    extends State<ComposeAnnouncementScreen> {
+    extends ConsumerState<ComposeAnnouncementScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
@@ -49,27 +54,62 @@ class _ComposeAnnouncementScreenState
     super.dispose();
   }
 
+  String _mapTargetRole(String t) {
+    switch (t) {
+      case 'Students Only':
+        return 'student';
+      case 'Staff Only':
+        return 'staff';
+      default:
+        return 'all';
+    }
+  }
+
   Future<void> _send() async {
     if (!_formKey.currentState!.validate()) return;
+    final user = ref.read(currentUserProvider);
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in.')),
+      );
+      return;
+    }
+
     setState(() => _isSending = true);
 
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final id =
+          'ann_${const Uuid().v4().replaceAll('-', '').substring(0, 12)}';
+      final ann = Announcement(
+        announcementId: id,
+        title: _titleController.text.trim(),
+        body: _bodyController.text.trim(),
+        sentBy: user.name,
+        targetRole: _mapTargetRole(_targetType),
+        createdAt: DateTime.now(),
+      );
+      await ref.read(firestoreServiceProvider).postAnnouncement(ann);
 
-    if (!mounted) return;
-    setState(() => _isSending = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isScheduled && _scheduledTime != null
-              ? 'Announcement scheduled for ${_formatDate(_scheduledTime!)}'
-              : 'Announcement sent to $_targetType',
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isScheduled && _scheduledTime != null
+                ? 'Announcement scheduled for ${_formatDate(_scheduledTime!)}'
+                : 'Announcement published',
+          ),
+          backgroundColor: AppColors.success,
         ),
-        backgroundColor: AppColors.success,
-      ),
-    );
-
-    context.pop();
+      );
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
   }
 
   String _formatDate(DateTime dt) {

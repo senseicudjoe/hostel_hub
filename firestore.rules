@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Reads the caller's role from Firestore — used to gate admin-only writes.
+    // Costs one extra read per rule evaluation; acceptable for a university project.
+    function callerRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && callerRole() == 'admin';
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+    // Any signed-in user may read profiles (required for the roommates feature).
+    // Users may only create/update their own document.
+    // Critically: a user cannot escalate their own role or change another user's role.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+
+      allow create: if isOwner(userId)
+        && request.resource.data.uid == userId
+        && request.resource.data.role in ['student', 'staff'];
+
+      allow update: if isAdmin()
+        || (isOwner(userId)
+            // Prevent self-role escalation — role and uid are immutable after creation
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.uid  == resource.data.uid);
+
+      allow delete: if isAdmin();
+    }
+
+    // ── Rooms ─────────────────────────────────────────────────────────────────
+    // All authenticated users need read access (explore/booking feature).
+    // Write access is required by students for the booking flow (occupancy updates).
+    // In a production system this write path would be a Cloud Function — noted
+    // as technical debt; protected here by authentication at minimum.
+    match /rooms/{roomId} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // ── Allocations ──────────────────────────────────────────────────────────
+    // Students may only read and manage their own allocations.
+    // Admins have full access to see all allocations.
+    match /allocations/{allocationId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.studentUid == request.auth.uid);
+
+      // Self-booking, or admin assigns a student (matches Flutter `allocateRoom`).
+      allow create: if isSignedIn()
+        && (
+          request.resource.data.studentUid == request.auth.uid
+          || isAdmin()
+        );
+
+      allow update: if isAdmin()
+        || (isSignedIn() && resource.data.studentUid == request.auth.uid);
+
+      allow delete: if isAdmin();
+    }
+
+    // ── Maintenance Requests ──────────────────────────────────────────────────
+    // Students may only see their own requests.
+    // Students may submit requests, but only for themselves.
+    // Status updates (in_progress, resolved, etc.) are admin-only.
+    // A student may edit their own request only while it is still pending.
+    match /maintenance_requests/{requestId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.studentUid == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && request.resource.data.studentUid == request.auth.uid;
+
+      allow update: if isAdmin()
+        || (isSignedIn()
+            && resource.data.studentUid == request.auth.uid
+            && resource.data.status == 'pending');
+
+      allow delete: if isAdmin();
+    }
+
+    // ── Announcements ─────────────────────────────────────────────────────────
+    // All signed-in users may read announcements.
+    // Only admins may create, edit, or delete them.
+    match /announcements/{announcementId} {
+      allow read:                  if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}

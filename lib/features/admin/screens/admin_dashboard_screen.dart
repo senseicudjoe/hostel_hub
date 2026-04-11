@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/status_chip.dart';
@@ -21,6 +22,7 @@ class AdminDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
+    final requestsAsync = ref.watch(allMaintenanceRequestsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -58,47 +60,64 @@ class AdminDashboardScreen extends ConsumerWidget {
             // ── KPI Cards ─────────────────────────────────────
             const _SectionTitle('Overview'),
             const SizedBox(height: 10),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.5,
-              children: const [
-                _KpiCard(
-                  title: 'Total Requests',
-                  value: '47',
-                  change: '+12 this week',
-                  up: true,
-                  icon: Icons.build_rounded,
-                  color: AppColors.info,
-                ),
-                _KpiCard(
-                  title: 'Pending',
-                  value: '12',
-                  change: '−3 since yesterday',
-                  up: false,
-                  icon: Icons.schedule_rounded,
-                  color: AppColors.warning,
-                ),
-                _KpiCard(
-                  title: 'Resolved',
-                  value: '28',
-                  change: '+8 this week',
-                  up: true,
-                  icon: Icons.check_circle_outline,
-                  color: AppColors.success,
-                ),
-                _KpiCard(
-                  title: 'Occupancy',
-                  value: '94%',
-                  change: '+2% vs last sem',
-                  up: true,
-                  icon: Icons.people_outline,
-                  color: AppColors.primary,
-                ),
-              ],
+            requestsAsync.when(
+              data: (requests) {
+                final total = requests.length;
+                final pending = requests
+                    .where((r) => r.status == AppConstants.statusPending)
+                    .length;
+                final resolved = requests
+                    .where((r) => r.status == AppConstants.statusResolved)
+                    .length;
+                return GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 1.5,
+                  children: [
+                    _KpiCard(
+                      title: 'Total Requests',
+                      value: '$total',
+                      change: 'Live from Firestore',
+                      up: true,
+                      icon: Icons.build_rounded,
+                      color: AppColors.info,
+                    ),
+                    _KpiCard(
+                      title: 'Pending',
+                      value: '$pending',
+                      change: 'Awaiting action',
+                      up: false,
+                      icon: Icons.schedule_rounded,
+                      color: AppColors.warning,
+                    ),
+                    _KpiCard(
+                      title: 'Resolved',
+                      value: '$resolved',
+                      change: 'Completed',
+                      up: true,
+                      icon: Icons.check_circle_outline,
+                      color: AppColors.success,
+                    ),
+                    _KpiCard(
+                      title: 'In progress',
+                      value:
+                          '${requests.where((r) => r.status == AppConstants.statusInProgress).length}',
+                      change: 'Active work',
+                      up: true,
+                      icon: Icons.sync_rounded,
+                      color: AppColors.primary,
+                    ),
+                  ],
+                );
+              },
+              loading: () => const SizedBox(
+                height: 120,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (_, __) => const Text('Could not load request stats'),
             ),
 
             const SizedBox(height: 20),

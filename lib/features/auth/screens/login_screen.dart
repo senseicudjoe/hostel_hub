@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../services/auth_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-02 — Login Screen
@@ -48,21 +48,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      final authService = AuthService();
-      final user = await authService.login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      final user = await ref.read(authServiceProvider).login(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
 
-      if (user != null && mounted) {
-        // Set the user in Riverpod state.
-        ref.read(currentUserProvider.notifier).state = user;
-        // Navigate based on role.
-        if (user.role == 'admin') {
-          context.go('/admin');
-        } else {
-          context.go('/home');
-        }
+      if (!mounted) return;
+
+      if (user == null) {
+        setState(() => _errorMessage =
+            'No profile found in the database for this account. '
+            'If you just registered, wait a moment and try again, '
+            'or contact SLE.');
+        return;
+      }
+
+      ref.read(currentUserProvider.notifier).state = user;
+      if (user.role == AppConstants.roleAdmin) {
+        context.go('/admin');
+      } else {
+        context.go('/home');
       }
     } catch (e) {
       setState(() => _errorMessage = e.toString());
@@ -71,17 +76,63 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  // ── Demo mode shortcuts ───────────────────────────────────────────────────
-  void _loginAsDemo(bool asAdmin) {
-    final user = asAdmin ? DemoUsers.admin : DemoUsers.student;
-    ref.read(currentUserProvider.notifier).state = user;
-    context.go(asAdmin ? '/admin' : '/home');
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final user = await ref.read(authServiceProvider).signInWithGoogle();
+      if (!mounted) return;
+      if (user == null) {
+        // User cancelled the Google picker — do nothing
+        setState(() => _isLoading = false);
+        return;
+      }
+      ref.read(currentUserProvider.notifier).state = user;
+      if (user.role == AppConstants.roleAdmin) {
+        context.go('/admin');
+      } else {
+        context.go('/home');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _forgotPassword(BuildContext context) async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your email above first.')),
+      );
+      return;
+    }
+    try {
+      await ref.read(authServiceProvider).resetPassword(email);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password reset email sent. Check your inbox.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -106,23 +157,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Welcome back',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
+                  color: AppColors.textOf(context),
                   letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Sign in to your HostelHub account',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textMutedOf(context),
                 ),
               ),
 
@@ -214,13 +265,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     const SizedBox(height: 8),
 
-                    // Forgot password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {},
-                        child: const Text('Forgot password?'),
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () => context.push('/register'),
+                          child: const Text('Create account'),
+                        ),
+                        TextButton(
+                          onPressed: () => _forgotPassword(context),
+                          child: const Text('Forgot password?'),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 8),
@@ -255,7 +311,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       'or continue with',
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textSecondary.withOpacity(0.8),
+                        color: AppColors.textMutedOf(context).withValues(alpha: 0.8),
                       ),
                     ),
                   ),
@@ -265,18 +321,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              // ── SSO Button ───────────────────────────────────
-              OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'SSO integration requires Ashesi IdP setup'),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.school_outlined),
-                label: const Text('Sign in with Ashesi SSO'),
+              // ── Google Sign-In ────────────────────────────────
+              _GoogleSignInButton(
+                onPressed: _isLoading ? null : _signInWithGoogle,
               ),
 
               const SizedBox(height: 12),
@@ -295,67 +342,63 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 label: const Text('Use Biometrics'),
               ),
 
-              const SizedBox(height: 32),
-
-              // ── Demo Mode ─────────────────────────────────────
-              // This section lets you explore all screens without Firebase.
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: AppColors.primary.withOpacity(0.2)),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.preview_rounded,
-                            size: 18, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Demo Mode — explore without an account',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(44),
-                            ),
-                            onPressed: () => _loginAsDemo(false),
-                            child: const Text('Demo Student'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(44),
-                            ),
-                            onPressed: () => _loginAsDemo(true),
-                            child: const Text('Demo Admin'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Google Sign-In Button
+// Follows Google's branding guidelines: white/surface background, Google G logo
+// rendered as coloured text segments, "Sign in with Google" label.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _GoogleSignInButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  const _GoogleSignInButton({this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        backgroundColor: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+        side: BorderSide(
+          color: isDark ? const Color(0xFF444444) : const Color(0xFFDDDDDD),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Google "G" logo — four coloured segments via RichText
+          RichText(
+            text: const TextSpan(
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              children: [
+                TextSpan(text: 'G', style: TextStyle(color: Color(0xFF4285F4))),
+                TextSpan(text: 'o', style: TextStyle(color: Color(0xFFEA4335))),
+                TextSpan(text: 'o', style: TextStyle(color: Color(0xFFFBBC05))),
+                TextSpan(text: 'g', style: TextStyle(color: Color(0xFF4285F4))),
+                TextSpan(text: 'l', style: TextStyle(color: Color(0xFF34A853))),
+                TextSpan(text: 'e', style: TextStyle(color: Color(0xFFEA4335))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Sign in with Google',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : const Color(0xFF3C4043),
+            ),
+          ),
+        ],
       ),
     );
   }

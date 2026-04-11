@@ -1,8 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/maintenance_request.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-06 — New Maintenance Request Screen
@@ -11,7 +17,7 @@ import '../../../core/theme/app_theme.dart';
 //   • Category (dropdown)
 //   • Title
 //   • Description
-//   • Photo attachments (simulated — would use image_picker in real app)
+//   • Photo attachments (camera or gallery — real image_picker integration)
 //   • Auto-filled room info (read-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -25,6 +31,8 @@ const _categories = [
   'General',
 ];
 
+const _maxPhotos = 3;
+
 class NewRequestScreen extends ConsumerStatefulWidget {
   const NewRequestScreen({super.key});
 
@@ -36,9 +44,10 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
+  final _uuid = const Uuid();
 
   String? _selectedCategory;
-  bool _hasPhoto = false;
+  final List<File> _pickedFiles = [];
   bool _isSubmitting = false;
 
   @override
@@ -48,23 +57,112 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
     super.dispose();
   }
 
+  // ── Image picking ─────────────────────────────────────────
+
+  Future<void> _pickFromCamera() async {
+    if (_pickedFiles.length >= _maxPhotos) return;
+    try {
+      final file = await ref
+          .read(storageServiceProvider)
+          .pickImage(fromCamera: true);
+      if (file != null && mounted) {
+        setState(() => _pickedFiles.add(file));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open camera: $e')),
+      );
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    if (_pickedFiles.length >= _maxPhotos) return;
+    try {
+      final remaining = _maxPhotos - _pickedFiles.length;
+      final files = await ref
+          .read(storageServiceProvider)
+          .pickMultipleImages(maxCount: remaining);
+      if (files.isNotEmpty && mounted) {
+        setState(() => _pickedFiles.addAll(files));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open gallery: $e')),
+      );
+    }
+  }
+
+  void _removePhoto(int index) {
+    setState(() => _pickedFiles.removeAt(index));
+  }
+
+  // ── Submit ────────────────────────────────────────────────
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final user = ref.read(currentUserProvider);
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to submit.')),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
-    // Simulate network call.
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final fs = ref.read(firestoreServiceProvider);
+      final alloc = await fs.getStudentAllocation(user.uid);
+      final roomId =
+          alloc?['roomId'] as String? ?? 'unassigned_${user.uid}';
 
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
+      final requestId =
+          'req_${_uuid.v4().replaceAll('-', '').substring(0, 12)}';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Request submitted! You\'ll be notified of updates.'),
-        backgroundColor: AppColors.success,
-      ),
-    );
-    context.pop();
+      // Upload any picked images and get their download URLs
+      List<String> imageUrls = [];
+      if (_pickedFiles.isNotEmpty) {
+        imageUrls = await ref
+            .read(storageServiceProvider)
+            .uploadMaintenanceImages(requestId, _pickedFiles);
+      }
+
+      final now = DateTime.now();
+      final request = MaintenanceRequest(
+        requestId: requestId,
+        studentUid: user.uid,
+        roomId: roomId,
+        title: _titleController.text.trim(),
+        description: _descController.text.trim(),
+        category: _selectedCategory ?? 'General',
+        roomNumber: user.roomNumber,
+        hostelName: user.hostel,
+        imageUrls: imageUrls,
+        status: AppConstants.statusPending,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await fs.submitMaintenanceRequest(request);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Request submitted! You\'ll be notified of updates.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not submit: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -87,7 +185,7 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
             const SizedBox(height: 20),
 
             // ── Category ──────────────────────────────────────
-            _SectionLabel(label: 'Category *'),
+            const _SectionLabel(label: 'Category *'),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _selectedCategory,
@@ -104,7 +202,7 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
             const SizedBox(height: 16),
 
             // ── Title ─────────────────────────────────────────
-            _SectionLabel(label: 'Issue Title *'),
+            const _SectionLabel(label: 'Issue Title *'),
             const SizedBox(height: 8),
             TextFormField(
               controller: _titleController,
@@ -125,7 +223,7 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
             const SizedBox(height: 16),
 
             // ── Description ───────────────────────────────────
-            _SectionLabel(label: 'Description *'),
+            const _SectionLabel(label: 'Description *'),
             const SizedBox(height: 8),
             TextFormField(
               controller: _descController,
@@ -149,23 +247,16 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
             const SizedBox(height: 16),
 
             // ── Photo Attachments ─────────────────────────────
-            _SectionLabel(label: 'Photos (optional)'),
+            _SectionLabel(
+              label: 'Photos (optional · max $_maxPhotos)',
+            ),
             const SizedBox(height: 8),
             _PhotoPicker(
-              hasPhoto: _hasPhoto,
-              onPickCamera: () {
-                setState(() => _hasPhoto = true);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Camera would open here')),
-                );
-              },
-              onPickGallery: () {
-                setState(() => _hasPhoto = true);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Gallery would open here')),
-                );
-              },
-              onRemove: () => setState(() => _hasPhoto = false),
+              pickedFiles: _pickedFiles,
+              maxPhotos: _maxPhotos,
+              onPickCamera: _pickFromCamera,
+              onPickGallery: _pickFromGallery,
+              onRemove: _removePhoto,
             ),
 
             const SizedBox(height: 24),
@@ -248,8 +339,7 @@ class _RoomInfoBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.success.withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
-        border:
-            Border.all(color: AppColors.success.withOpacity(0.2)),
+        border: Border.all(color: AppColors.success.withOpacity(0.2)),
       ),
       child: Row(
         children: [
@@ -270,14 +360,18 @@ class _RoomInfoBanner extends StatelessWidget {
   }
 }
 
+// ── Photo Picker ──────────────────────────────────────────────────────────────
+
 class _PhotoPicker extends StatelessWidget {
-  final bool hasPhoto;
+  final List<File> pickedFiles;
+  final int maxPhotos;
   final VoidCallback onPickCamera;
   final VoidCallback onPickGallery;
-  final VoidCallback onRemove;
+  final ValueChanged<int> onRemove;
 
   const _PhotoPicker({
-    required this.hasPhoto,
+    required this.pickedFiles,
+    required this.maxPhotos,
     required this.onPickCamera,
     required this.onPickGallery,
     required this.onRemove,
@@ -285,59 +379,77 @@ class _PhotoPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final canAdd = pickedFiles.length < maxPhotos;
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
       children: [
-        // Camera button
-        _PickerButton(
-          icon: Icons.camera_alt_rounded,
-          label: 'Camera',
-          onTap: onPickCamera,
-        ),
-        const SizedBox(width: 10),
-
-        // Gallery button
-        _PickerButton(
-          icon: Icons.photo_library_rounded,
-          label: 'Gallery',
-          onTap: onPickGallery,
-        ),
-
-        if (hasPhoto) ...[
-          const SizedBox(width: 10),
-          // Photo preview thumbnail (simulated)
-          Stack(
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                ),
-                child: const Icon(Icons.image_rounded,
-                    color: AppColors.primary, size: 32),
-              ),
-              Positioned(
-                top: -4,
-                right: -4,
-                child: GestureDetector(
-                  onTap: onRemove,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: const BoxDecoration(
-                      color: AppColors.error,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.close,
-                        color: Colors.white, size: 12),
-                  ),
-                ),
-              ),
-            ],
+        // Camera button — hidden once limit is reached
+        if (canAdd)
+          _PickerButton(
+            icon: Icons.camera_alt_rounded,
+            label: 'Camera',
+            onTap: onPickCamera,
           ),
-        ],
+
+        // Gallery button — hidden once limit is reached
+        if (canAdd)
+          _PickerButton(
+            icon: Icons.photo_library_rounded,
+            label: 'Gallery',
+            onTap: onPickGallery,
+          ),
+
+        // Real image thumbnails
+        ...List.generate(
+          pickedFiles.length,
+          (i) => _Thumbnail(
+            file: pickedFiles[i],
+            onRemove: () => onRemove(i),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Thumbnail extends StatelessWidget {
+  final File file;
+  final VoidCallback onRemove;
+
+  const _Thumbnail({required this.file, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.file(
+            file,
+            width: 64,
+            height: 64,
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned(
+          top: -6,
+          right: -6,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                color: AppColors.error,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, color: Colors.white, size: 12),
+            ),
+          ),
+        ),
       ],
     );
   }

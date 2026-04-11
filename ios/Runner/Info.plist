@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Hostel Hub needs camera access to attach photos to maintenance requests.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Hostel Hub needs photo library access to attach images to maintenance requests.</string>
 </dict>
 </plist>

@@ -33,10 +33,10 @@ const _slides = [
     color: Color(0xFFA53A3E),
   ),
   _Slide(
-    icon: Icons.directions_bus_rounded,
-    title: 'Book Your Shuttle',
+    icon: Icons.meeting_room_rounded,
+    title: 'Book Your Room',
     subtitle:
-        'View live schedules, check available seats, and secure your spot on the campus shuttle in seconds.',
+        'Browse available rooms, secure your spot in your preferred hostel, and manage your booking from your phone.',
     color: Color(0xFF1565C0),
   ),
   _Slide(

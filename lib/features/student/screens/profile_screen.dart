@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:local_auth/local_auth.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-11 — Profile & Settings Screen
-//
-// Shared by both students and admins (role-aware).
-// Sections:
-//   • Profile header (avatar, name, email, room info)
-//   • Notification toggles
-//   • Preferences (dark mode, biometric login)
-//   • Account actions (sign out)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -23,19 +17,19 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  // Notification preferences
+  // Local notification toggle state (stored per-session; wiring to FCM
+  // topic subscribe/unsubscribe happens here)
   bool _maintenanceNotifs = true;
-  bool _shuttleNotifs = true;
   bool _announcementNotifs = true;
-
-  // Preferences
-  bool _darkMode = false;
-  bool _biometric = false;
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final isAdmin = ref.watch(isAdminProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final biometricEnabled = ref.watch(biometricEnabledProvider);
+    final isDark = themeMode == ThemeMode.dark;
+
     final initials = user?.name
             .trim()
             .split(' ')
@@ -45,12 +39,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         '?';
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
       appBar: AppBar(title: const Text('Profile')),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // ── Profile Header ────────────────────────────────
+            // ── Profile Header ───────────────────────────────────
             _ProfileHeader(
               initials: initials,
               name: user?.name ?? '—',
@@ -63,7 +56,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: 8),
 
-            // ── Notifications Section ─────────────────────────
+            // ── Notifications ────────────────────────────────────
             _SectionHeader(title: 'Notifications'),
             _SettingsCard(children: [
               _ToggleTile(
@@ -71,17 +64,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 title: 'Maintenance Updates',
                 subtitle: 'Get notified when your request status changes',
                 value: _maintenanceNotifs,
-                onChanged: (v) =>
-                    setState(() => _maintenanceNotifs = v),
-              ),
-              const Divider(height: 1),
-              _ToggleTile(
-                icon: Icons.directions_bus_outlined,
-                title: 'Shuttle Reminders',
-                subtitle: '15 minutes before your booked departure',
-                value: _shuttleNotifs,
-                onChanged: (v) =>
-                    setState(() => _shuttleNotifs = v),
+                onChanged: (v) {
+                  setState(() => _maintenanceNotifs = v);
+                  final ns = ref.read(notificationServiceProvider);
+                  if (v) {
+                    ns.subscribeToRole(
+                        ref.read(userRoleProvider));
+                  } else {
+                    ns.unsubscribeAll();
+                  }
+                },
               ),
               const Divider(height: 1),
               _ToggleTile(
@@ -89,67 +81,42 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 title: 'Announcements',
                 subtitle: 'Important notices from SLE',
                 value: _announcementNotifs,
-                onChanged: (v) =>
-                    setState(() => _announcementNotifs = v),
+                onChanged: (v) => setState(() => _announcementNotifs = v),
               ),
             ]),
 
             const SizedBox(height: 8),
 
-            // ── Preferences Section ───────────────────────────
+            // ── Preferences ──────────────────────────────────────
             _SectionHeader(title: 'Preferences'),
             _SettingsCard(children: [
               _ToggleTile(
                 icon: Icons.dark_mode_outlined,
                 title: 'Dark Mode',
                 subtitle: 'Use dark theme throughout the app',
-                value: _darkMode,
-                onChanged: (v) {
-                  setState(() => _darkMode = v);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Dark mode toggle — full theming coming soon'),
-                    ),
-                  );
-                },
+                value: isDark,
+                onChanged: (v) =>
+                    ref.read(themeModeProvider.notifier).setDarkMode(v),
               ),
               const Divider(height: 1),
               _ToggleTile(
                 icon: Icons.fingerprint_rounded,
                 title: 'Biometric Login',
-                subtitle: 'Use fingerprint or Face ID to sign in',
-                value: _biometric,
-                onChanged: (v) {
-                  setState(() => _biometric = v);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Requires local_auth package setup'),
-                    ),
-                  );
-                },
+                subtitle: 'Use fingerprint or Face ID to unlock the app',
+                value: biometricEnabled,
+                onChanged: (v) => _toggleBiometric(context, v),
               ),
             ]),
 
             const SizedBox(height: 8),
 
-            // ── Account Section ───────────────────────────────
+            // ── Account ──────────────────────────────────────────
             _SectionHeader(title: 'Account'),
             _SettingsCard(children: [
               _ActionTile(
                 icon: Icons.lock_reset_rounded,
                 title: 'Change Password',
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Opens password reset flow')),
-                  );
-                },
-              ),
-              const Divider(height: 1),
-              _ActionTile(
-                icon: Icons.privacy_tip_outlined,
-                title: 'Privacy Policy',
-                onTap: () {},
+                onTap: () => _showChangePasswordDialog(context),
               ),
               const Divider(height: 1),
               _ActionTile(
@@ -160,20 +127,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   style: TextStyle(
                       fontSize: 12, color: AppColors.textSecondary),
                 ),
-                onTap: () {},
+                onTap: () => _showAboutDialog(context),
               ),
             ]),
 
             const SizedBox(height: 16),
 
-            // ── Sign Out ──────────────────────────────────────
+            // ── Sign Out ─────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.error,
                   side: BorderSide(
-                      color: AppColors.error.withOpacity(0.4)),
+                      color: AppColors.error.withValues(alpha: 0.4)),
                 ),
                 onPressed: () => _confirmSignOut(context, ref),
                 icon: const Icon(Icons.logout_rounded),
@@ -188,13 +155,126 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  // ── Biometric toggle ────────────────────────────────────────────────────────
+
+  Future<void> _toggleBiometric(BuildContext context, bool enable) async {
+    if (enable) {
+      // Verify the device actually supports biometrics before enabling
+      try {
+        final auth = LocalAuthentication();
+        final canCheck = await auth.canCheckBiometrics;
+        final isSupported = await auth.isDeviceSupported();
+        if (!canCheck && !isSupported) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'Biometric authentication is not available on this device.'),
+              ),
+            );
+          }
+          return;
+        }
+        // Do a test authenticate to confirm enrolment
+        final confirmed = await auth.authenticate(
+          localizedReason: 'Confirm your biometric to enable this feature',
+          options: const AuthenticationOptions(stickyAuth: true),
+        );
+        if (!confirmed) return;
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not verify biometrics. Please try again.'),
+            ),
+          );
+        }
+        return;
+      }
+    }
+    ref.read(biometricEnabledProvider.notifier).setEnabled(enable);
+  }
+
+  // ── Change Password dialog ──────────────────────────────────────────────────
+
+  Future<void> _showChangePasswordDialog(BuildContext context) async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    // For demo users there is no Firebase session — send reset via email flow
+    final isDemoUser =
+        user.uid == 'demo_student_001' || user.uid == 'demo_admin_001';
+    if (isDemoUser) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Demo accounts cannot change passwords.')),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Change Password'),
+        content: Text(
+          'A password reset link will be sent to\n${user.email}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Send Reset Email'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !context.mounted) return;
+
+    try {
+      await ref.read(authServiceProvider).resetPassword(user.email);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password reset email sent. Check your inbox.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  // ── About dialog ────────────────────────────────────────────────────────────
+
+  void _showAboutDialog(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'HostelHub',
+      applicationVersion: '1.0.0',
+      applicationLegalese:
+          '© 2026 Ashesi University — Team KNCF\n'
+          'Built with Flutter & Firebase',
+    );
+  }
+
+  // ── Sign Out ─────────────────────────────────────────────────────────────────
+
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Sign Out'),
-        content: const Text(
-            'Are you sure you want to sign out of HostelHub?'),
+        content:
+            const Text('Are you sure you want to sign out of HostelHub?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -211,14 +291,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
 
     if (confirm == true && context.mounted) {
+      try {
+        await ref.read(authServiceProvider).logout();
+      } catch (_) {}
+      try {
+        await ref.read(notificationServiceProvider).unsubscribeAll();
+      } catch (_) {}
       ref.read(currentUserProvider.notifier).state = null;
-      context.go('/login');
+      if (context.mounted) context.go('/login');
     }
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Profile Header
+// Profile Header — theme-aware
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ProfileHeader extends StatelessWidget {
@@ -239,7 +325,7 @@ class _ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: AppColors.cardOf(context),
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       child: Column(
         children: [
@@ -272,27 +358,26 @@ class _ProfileHeader extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             name,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
+              color: AppColors.textOf(context),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             email,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: AppColors.textMutedOf(context),
             ),
           ),
           const SizedBox(height: 8),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               color: isAdmin
-                  ? AppColors.warning.withOpacity(0.1)
+                  ? AppColors.warning.withValues(alpha: 0.1)
                   : AppColors.primaryLight,
               borderRadius: BorderRadius.circular(20),
             ),
@@ -301,8 +386,7 @@ class _ProfileHeader extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color:
-                    isAdmin ? AppColors.warning : AppColors.primary,
+                color: isAdmin ? AppColors.warning : AppColors.primary,
               ),
             ),
           ),
@@ -313,7 +397,7 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Reusable layout helpers
+// Reusable layout helpers — theme-aware
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
@@ -326,11 +410,11 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
-          color: AppColors.textSecondary,
+          color: AppColors.textMutedOf(context),
         ),
       ),
     );
@@ -346,9 +430,9 @@ class _SettingsCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardOf(context),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: AppColors.dividerOf(context)),
       ),
       child: Column(children: children),
     );
@@ -375,15 +459,21 @@ class _ToggleTile extends StatelessWidget {
     return ListTile(
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Icon(icon, color: AppColors.textSecondary, size: 22),
+      leading: Icon(icon, color: AppColors.textMutedOf(context), size: 22),
       title: Text(
         title,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textOf(context),
+        ),
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(
-            fontSize: 12, color: AppColors.textSecondary),
+        style: TextStyle(
+          fontSize: 12,
+          color: AppColors.textMutedOf(context),
+        ),
       ),
       trailing: Switch(value: value, onChanged: onChanged),
     );
@@ -408,14 +498,17 @@ class _ActionTile extends StatelessWidget {
     return ListTile(
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      leading: Icon(icon, color: AppColors.textSecondary, size: 22),
+      leading: Icon(icon, color: AppColors.textMutedOf(context), size: 22),
       title: Text(
         title,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textOf(context),
+        ),
       ),
       trailing: trailing ??
-          const Icon(Icons.chevron_right,
-              color: AppColors.textHint),
+          Icon(Icons.chevron_right, color: AppColors.textMutedOf(context)),
       onTap: onTap,
     );
   }

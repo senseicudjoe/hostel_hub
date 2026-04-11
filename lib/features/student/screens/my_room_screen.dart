@@ -1,16 +1,16 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/room_model.dart';
+import '../../../models/user_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-04 — My Room Screen
-//
-// Displays:
-//   • Room details (hostel, number, floor, bed)
-//   • Roommate info card
-//   • QR code placeholder (scan to identify room)
-//   • Navigate to hostel button
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MyRoomScreen extends ConsumerWidget {
@@ -19,55 +19,126 @@ class MyRoomScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
+    final roomAsync = ref.watch(myRoomProvider);
+    final roommatesAsync = ref.watch(roommatesProvider);
+    final hasRoom =
+        (user?.roomNumber.trim().isNotEmpty ?? false) &&
+        (user?.hostel.trim().isNotEmpty ?? false);
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('My Room'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner_rounded),
-            tooltip: 'Scan Room QR',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Opening QR scanner...')),
-              );
-            },
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('My Room')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Room Details Card ─────────────────────────────
-            _RoomDetailsCard(user: user),
+            if (!hasRoom) ...[
+              _NoRoomCard(onExplore: () => context.go('/explore')),
+              const SizedBox(height: 16),
+            ],
+
+            // ── Room details ─────────────────────────────────────
+            roomAsync.when(
+              loading: () => hasRoom
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : const SizedBox.shrink(),
+              error: (_, __) =>
+                  _RoomDetailsCard(user: user, room: null, hasRoom: hasRoom),
+              data: (room) =>
+                  _RoomDetailsCard(user: user, room: room, hasRoom: hasRoom),
+            ),
+
+            // ── Room photos ──────────────────────────────────────
+            if (hasRoom)
+              roomAsync.maybeWhen(
+                data: (room) {
+                  if (room == null || room.imageUrls.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: _RoomPhotosCard(imageUrls: room.imageUrls),
+                  );
+                },
+                orElse: () => const SizedBox.shrink(),
+              ),
+
+            // ── Roommates ────────────────────────────────────────
+            if (hasRoom) ...[
+              const SizedBox(height: 16),
+              roommatesAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (roommates) => _RoommatesCard(roommates: roommates),
+              ),
+            ],
 
             const SizedBox(height: 16),
 
-            // ── Roommate Card ─────────────────────────────────
-            const _RoommateCard(),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.search_rounded),
+              label: Text(hasRoom ? 'Explore other rooms' : 'Explore rooms'),
+              onPressed: () => context.go('/explore'),
+            ),
 
             const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-            // ── QR Code Card ──────────────────────────────────
-            _QRCodeCard(roomNumber: user?.roomNumber ?? 'U-204'),
+// ── No Room Card ──────────────────────────────────────────────────────────────
 
-            const SizedBox(height: 16),
+class _NoRoomCard extends StatelessWidget {
+  final VoidCallback onExplore;
+  const _NoRoomCard({required this.onExplore});
 
-            // ── Navigate Button ───────────────────────────────
-            ElevatedButton.icon(
-              icon: const Icon(Icons.navigation_rounded),
-              label: const Text('Navigate to Hostel'),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                        'Opening maps navigation to Unity Hall...'),
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.info_outline, color: AppColors.warning),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No room assigned yet',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textOf(context),
+                    ),
                   ),
-                );
-              },
+                  const SizedBox(height: 4),
+                  Text(
+                    'Explore available rooms and book one.',
+                    style: TextStyle(color: AppColors.textMutedOf(context)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton(
+              onPressed: onExplore,
+              child: const Text('Explore'),
             ),
           ],
         ),
@@ -76,14 +147,57 @@ class MyRoomScreen extends ConsumerWidget {
   }
 }
 
-// ── Room Details ─────────────────────────────────────────────────────────────
+// ── Room Details Card ─────────────────────────────────────────────────────────
 
 class _RoomDetailsCard extends StatelessWidget {
   final dynamic user;
-  const _RoomDetailsCard({this.user});
+  final RoomModel? room;
+  final bool hasRoom;
+
+  const _RoomDetailsCard({this.user, required this.room, required this.hasRoom});
+
+  String _floorLabel() {
+    if (room == null) return '—';
+    final f = room!.floor;
+    if (f <= 0) return '—';
+    return 'Floor $f';
+  }
+
+  String _statusLabel() {
+    if (room == null) return hasRoom ? 'Assigned' : 'Unassigned';
+    switch (room!.status) {
+      case AppConstants.roomAvailable:
+        return 'Available';
+      case AppConstants.roomOccupied:
+        return 'Occupied';
+      case AppConstants.roomMaintenance:
+        return 'Maintenance';
+      default:
+        return room!.status;
+    }
+  }
+
+  Color _statusColor() {
+    if (room == null) {
+      return hasRoom ? AppColors.success : AppColors.warning;
+    }
+    switch (room!.status) {
+      case AppConstants.roomMaintenance:
+        return AppColors.warning;
+      case AppConstants.roomOccupied:
+        return AppColors.success;
+      default:
+        return AppColors.info;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final roomNumber = room?.roomNumber ??
+        (hasRoom ? user?.roomNumber?.toString() ?? '' : 'Not Assigned');
+    final hostel =
+        room?.hostelName ?? (hasRoom ? user?.hostel?.toString() ?? '' : '');
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -102,58 +216,83 @@ class _RoomDetailsCard extends StatelessWidget {
                       color: AppColors.primary),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user?.roomNumber ?? 'U-204',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        roomNumber,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textOf(context),
+                        ),
                       ),
-                    ),
-                    Text(
-                      user?.hostel ?? 'Unity Hall',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
+                      Text(
+                        hostel.isNotEmpty
+                            ? hostel
+                            : 'Book a room to see details',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMutedOf(context),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 12),
-            _detailRow(Icons.layers_outlined, 'Floor', '2nd Floor'),
-            const SizedBox(height: 10),
-            _detailRow(Icons.single_bed_rounded, 'Bed', 'Bed A'),
-            const SizedBox(height: 10),
-            _detailRow(Icons.people_outline, 'Capacity', '2 students'),
+            _detailRow(context, Icons.layers_outlined, 'Floor',
+                hasRoom ? _floorLabel() : '—'),
             const SizedBox(height: 10),
             _detailRow(
-                Icons.check_circle_outline, 'Status', 'Occupied',
-                valueColor: AppColors.success),
+              context,
+              Icons.people_outline,
+              'Occupancy',
+              room != null
+                  ? '${room!.currentOccupants} / ${room!.capacity} students'
+                  : (hasRoom ? '—' : '—'),
+            ),
+            const SizedBox(height: 10),
+            _detailRow(
+              context,
+              Icons.meeting_room_outlined,
+              'Room type',
+              room != null && room!.capacity > 1
+                  ? 'Shared (${room!.capacity} beds)'
+                  : 'Single',
+            ),
+            const SizedBox(height: 10),
+            _detailRow(
+              context,
+              Icons.check_circle_outline,
+              'Room status',
+              _statusLabel(),
+              valueColor: _statusColor(),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _detailRow(IconData icon, String label, String value,
-      {Color? valueColor}) {
+  Widget _detailRow(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: AppColors.textSecondary),
+        Icon(icon, size: 18, color: AppColors.textMutedOf(context)),
         const SizedBox(width: 10),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppColors.textSecondary,
-          ),
+          style: TextStyle(fontSize: 13, color: AppColors.textMutedOf(context)),
         ),
         const Spacer(),
         Text(
@@ -161,7 +300,7 @@ class _RoomDetailsCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: valueColor ?? AppColors.textPrimary,
+            color: valueColor ?? AppColors.textOf(context),
           ),
         ),
       ],
@@ -169,10 +308,11 @@ class _RoomDetailsCard extends StatelessWidget {
   }
 }
 
-// ── Roommate Card ─────────────────────────────────────────────────────────────
+// ── Room Photos Card ──────────────────────────────────────────────────────────
 
-class _RoommateCard extends StatelessWidget {
-  const _RoommateCard();
+class _RoomPhotosCard extends StatelessWidget {
+  final List<String> imageUrls;
+  const _RoomPhotosCard({required this.imageUrls});
 
   @override
   Widget build(BuildContext context) {
@@ -182,70 +322,133 @@ class _RoommateCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Roommate',
+            Text(
+              'Room Photos',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textSecondary,
+                color: AppColors.textMutedOf(context),
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                // Avatar
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.info.withOpacity(0.15),
-                  child: const Text(
-                    'AO',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.info,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Ama Owusu',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
+            SizedBox(
+              height: 180,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: imageUrls.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (context, i) {
+                  return GestureDetector(
+                    onTap: () => _showFullScreen(context, i),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: CachedNetworkImage(
+                        imageUrl: imageUrls[i],
+                        width: 220,
+                        height: 180,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          width: 220,
+                          color: AppColors.dividerOf(context),
+                          child: const Center(
+                              child: CircularProgressIndicator()),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          width: 220,
+                          color: AppColors.dividerOf(context),
+                          child: const Icon(Icons.broken_image_outlined,
+                              size: 40, color: AppColors.textHint),
+                        ),
                       ),
                     ),
-                    Text(
-                      'ama.owusu@ashesi.edu.gh',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    Text(
-                      'Bed B · Year 2',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  );
+                },
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  void _showFullScreen(BuildContext context, int initial) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _FullScreenGallery(
+          imageUrls: imageUrls,
+          initialIndex: initial,
+        ),
+      ),
+    );
+  }
 }
 
-// ── QR Code Card ──────────────────────────────────────────────────────────────
+class _FullScreenGallery extends StatefulWidget {
+  final List<String> imageUrls;
+  final int initialIndex;
+  const _FullScreenGallery(
+      {required this.imageUrls, required this.initialIndex});
 
-class _QRCodeCard extends StatelessWidget {
-  final String roomNumber;
-  const _QRCodeCard({required this.roomNumber});
+  @override
+  State<_FullScreenGallery> createState() => _FullScreenGalleryState();
+}
+
+class _FullScreenGalleryState extends State<_FullScreenGallery> {
+  late final PageController _controller;
+  late int _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initialIndex;
+    _controller = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text('${_current + 1} / ${widget.imageUrls.length}'),
+      ),
+      body: PageView.builder(
+        controller: _controller,
+        itemCount: widget.imageUrls.length,
+        onPageChanged: (i) => setState(() => _current = i),
+        itemBuilder: (_, i) => InteractiveViewer(
+          child: Center(
+            child: CachedNetworkImage(
+              imageUrl: widget.imageUrls[i],
+              fit: BoxFit.contain,
+              placeholder: (_, __) =>
+                  const Center(child: CircularProgressIndicator()),
+              errorWidget: (_, __, ___) => const Icon(
+                Icons.broken_image_outlined,
+                color: Colors.white54,
+                size: 64,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Roommates Card ────────────────────────────────────────────────────────────
+
+class _RoommatesCard extends StatelessWidget {
+  final List<UserModel> roommates;
+  const _RoommatesCard({required this.roommates});
 
   @override
   Widget build(BuildContext context) {
@@ -253,67 +456,92 @@ class _QRCodeCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Room QR Code',
+            Text(
+              'Room Occupants',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Scan this to identify your room or share with maintenance staff',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // QR code placeholder — in a real app, use qr_flutter package:
-            // QrImageView(data: roomNumber, version: QrVersions.auto, size: 140)
-            Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.divider, width: 2),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.qr_code_2_rounded,
-                      size: 72, color: AppColors.textPrimary),
-                  const SizedBox(height: 4),
-                  Text(
-                    roomNumber,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ],
+                color: AppColors.textMutedOf(context),
               ),
             ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.share_rounded, size: 16),
-              label: const Text('Share QR Code'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(0, 40),
-              ),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sharing QR code...')),
-                );
-              },
-            ),
+            if (roommates.isEmpty)
+              Text(
+                'You\'re the only one assigned to this room right now.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textMutedOf(context),
+                ),
+              )
+            else
+              ...roommates.map((r) => _RoommateRow(roommate: r)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RoommateRow extends StatelessWidget {
+  final UserModel roommate;
+  const _RoommateRow({required this.roommate});
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = roommate.name
+        .trim()
+        .split(' ')
+        .take(2)
+        .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
+        .join();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: AppColors.primaryLight,
+            backgroundImage: roommate.profileImageUrl.isNotEmpty
+                ? CachedNetworkImageProvider(roommate.profileImageUrl)
+                : null,
+            child: roommate.profileImageUrl.isEmpty
+                ? Text(
+                    initials,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  roommate.name,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textOf(context),
+                  ),
+                ),
+                Text(
+                  roommate.email,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textMutedOf(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

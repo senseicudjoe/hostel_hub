@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/maintenance_request.dart';
-import '../models/shuttle_booking.dart';
 import '../models/announcement.dart';
 import '../models/room_model.dart';
 import '../models/user_model.dart';
@@ -82,6 +81,40 @@ class FirestoreService {
         .update({'status': status});
   }
 
+  /// Live updates when the room document changes (occupancy, status, etc.).
+  Stream<RoomModel?> watchRoom(String roomId) {
+    return _db
+        .collection(AppConstants.roomsCollection)
+        .doc(roomId)
+        .snapshots()
+        .map((s) {
+      if (!s.exists || s.data() == null) return null;
+      final m = Map<String, dynamic>.from(s.data()!);
+      m['roomId'] = (m['roomId'] as String?)?.isNotEmpty == true
+          ? m['roomId']
+          : s.id;
+      return RoomModel.fromMap(m);
+    });
+  }
+
+  /// Resolves the student's active allocation → room document stream.
+  Stream<RoomModel?> watchStudentRoom(String studentUid) {
+    return _db
+        .collection(AppConstants.allocationsCollection)
+        .where('studentUid', isEqualTo: studentUid)
+        .where('status', isEqualTo: 'active')
+        .limit(1)
+        .snapshots()
+        .asyncExpand((snap) {
+      if (snap.docs.isEmpty) return Stream<RoomModel?>.value(null);
+      final roomId = snap.docs.first.data()['roomId'] as String?;
+      if (roomId == null || roomId.isEmpty) {
+        return Stream<RoomModel?>.value(null);
+      }
+      return watchRoom(roomId);
+    });
+  }
+
   // ── ALLOCATIONS ───────────────────────────────────────────
 
   Future<Map<String, dynamic>?> getStudentAllocation(String studentUid) async {
@@ -108,6 +141,8 @@ class FirestoreService {
     required String roomId,
     required String hostelName,
     required String roomNumber,
+    required int capacity,
+    required int currentOccupants,
   }) async {
     final id = 'alloc_${_uuid.v4().substring(0, 8)}';
     final batch = _db.batch();
@@ -123,10 +158,14 @@ class FirestoreService {
       'status':       'active',
     });
 
-    // Update room
+    // Update room — only mark as occupied when the room is actually full
+    final newOccupants = currentOccupants + 1;
+    final newStatus = newOccupants >= capacity
+        ? AppConstants.roomOccupied
+        : AppConstants.roomAvailable;
     batch.update(_db.collection(AppConstants.roomsCollection).doc(roomId), {
       'currentOccupants': FieldValue.increment(1),
-      'status':           AppConstants.roomOccupied,
+      'status':           newStatus,
     });
 
     // Update student profile
@@ -139,22 +178,45 @@ class FirestoreService {
   }
 
   Future<void> deallocateRoom(String allocationId, String studentUid, String roomId) async {
-    final batch = _db.batch();
+    final roomRef = _db.collection(AppConstants.roomsCollection).doc(roomId);
+    final allocRef = _db.collection(AppConstants.allocationsCollection).doc(allocationId);
+    final userRef = _db.collection(AppConstants.usersCollection).doc(studentUid);
 
-    batch.update(
-      _db.collection(AppConstants.allocationsCollection).doc(allocationId),
-      {'status': 'expired'},
-    );
-    batch.update(
-      _db.collection(AppConstants.roomsCollection).doc(roomId),
-      {'currentOccupants': FieldValue.increment(-1)},
-    );
-    batch.update(
-      _db.collection(AppConstants.usersCollection).doc(studentUid),
-      {'hostel': '', 'roomNumber': ''},
-    );
+    await _db.runTransaction((tx) async {
+      final roomSnap = await tx.get(roomRef);
+      final data = roomSnap.data() ?? {};
+      final currentOccupants = (data['currentOccupants'] as int?) ?? 1;
+      final currentStatus = (data['status'] as String?) ?? AppConstants.roomAvailable;
 
-    await batch.commit();
+      // Preserve maintenance status — only restore to available from occupied
+      final newStatus = currentStatus == AppConstants.roomMaintenance
+          ? AppConstants.roomMaintenance
+          : AppConstants.roomAvailable;
+
+      tx.update(allocRef, {'status': 'expired'});
+      tx.update(roomRef, {
+        'currentOccupants': (currentOccupants - 1).clamp(0, 9999),
+        'status': newStatus,
+      });
+      tx.update(userRef, {'hostel': '', 'roomNumber': ''});
+    });
+  }
+
+  // ── ROOMMATES ─────────────────────────────────────────────
+
+  /// Returns all students in the same hostel + room, excluding the requesting user.
+  Stream<List<UserModel>> getRoommates(
+      String hostel, String roomNumber, String excludeUid) {
+    return _db
+        .collection(AppConstants.usersCollection)
+        .where('hostel', isEqualTo: hostel)
+        .where('roomNumber', isEqualTo: roomNumber)
+        .where('role', isEqualTo: AppConstants.roleStudent)
+        .snapshots()
+        .map((s) => s.docs
+            .map((d) => UserModel.fromMap(d.data()))
+            .where((u) => u.uid != excludeUid)
+            .toList());
   }
 
   // ── MAINTENANCE REQUESTS ──────────────────────────────────
@@ -168,12 +230,19 @@ class FirestoreService {
   }
 
   Stream<List<MaintenanceRequest>> getStudentMaintenanceRequests(String studentUid) {
+    // Note: Avoiding `.orderBy('createdAt')` here removes the need for a composite
+    // index (studentUid + createdAt). We sort client-side instead.
     return _db
         .collection(AppConstants.maintenanceCollection)
         .where('studentUid', isEqualTo: studentUid)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => MaintenanceRequest.fromMap(d.data())).toList());
+        .map((s) {
+      final list = s.docs
+          .map((d) => MaintenanceRequest.fromMap(d.data()))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
   }
 
   Stream<List<MaintenanceRequest>> getAllMaintenanceRequests() {
@@ -188,9 +257,25 @@ class FirestoreService {
     return _db
         .collection(AppConstants.maintenanceCollection)
         .where('status', isEqualTo: status)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => MaintenanceRequest.fromMap(d.data())).toList());
+        .map((s) {
+      final list = s.docs
+          .map((d) => MaintenanceRequest.fromMap(d.data()))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
+  }
+
+  Stream<MaintenanceRequest?> watchMaintenanceRequest(String requestId) {
+    return _db
+        .collection(AppConstants.maintenanceCollection)
+        .doc(requestId)
+        .snapshots()
+        .map((s) {
+      if (!s.exists || s.data() == null) return null;
+      return MaintenanceRequest.fromMap(s.data()!);
+    });
   }
 
   Future<void> updateMaintenanceStatus({
@@ -205,73 +290,6 @@ class FirestoreService {
     });
   }
 
-  // ── SHUTTLE SCHEDULES ─────────────────────────────────────
-
-  Stream<List<Map<String, dynamic>>> getShuttleSchedules() {
-    return _db
-        .collection(AppConstants.shuttleSchedulesCollection)
-        .where('status', isEqualTo: 'active')
-        .orderBy('departureTime')
-        .snapshots()
-        .map((s) => s.docs.map((d) => d.data()).toList());
-  }
-
-  Future<void> updateShuttleScheduleSeats(String scheduleId, int delta) async {
-    await _db
-        .collection(AppConstants.shuttleSchedulesCollection)
-        .doc(scheduleId)
-        .update({'bookedSeats': FieldValue.increment(delta)});
-  }
-
-  // ── SHUTTLE BOOKINGS ──────────────────────────────────────
-
-  Future<void> bookShuttle(ShuttleBooking booking) async {
-    final batch = _db.batch();
-
-    batch.set(
-      _db.collection(AppConstants.shuttleBookingsCollection).doc(booking.bookingId),
-      booking.toMap(),
-    );
-    batch.update(
-      _db.collection(AppConstants.shuttleSchedulesCollection).doc(booking.scheduleId),
-      {'bookedSeats': FieldValue.increment(1)},
-    );
-
-    await batch.commit();
-  }
-
-  Stream<List<ShuttleBooking>> getStudentShuttleBookings(String studentUid) {
-    return _db
-        .collection(AppConstants.shuttleBookingsCollection)
-        .where('studentUid', isEqualTo: studentUid)
-        .orderBy('bookingTime', descending: true)
-        .snapshots()
-        .map((s) => s.docs.map((d) => ShuttleBooking.fromMap(d.data())).toList());
-  }
-
-  Stream<List<ShuttleBooking>> getAllShuttleBookings() {
-    return _db
-        .collection(AppConstants.shuttleBookingsCollection)
-        .orderBy('bookingTime', descending: true)
-        .snapshots()
-        .map((s) => s.docs.map((d) => ShuttleBooking.fromMap(d.data())).toList());
-  }
-
-  Future<void> cancelShuttleBooking(String bookingId, String scheduleId) async {
-    final batch = _db.batch();
-
-    batch.update(
-      _db.collection(AppConstants.shuttleBookingsCollection).doc(bookingId),
-      {'status': AppConstants.statusCancelled},
-    );
-    batch.update(
-      _db.collection(AppConstants.shuttleSchedulesCollection).doc(scheduleId),
-      {'bookedSeats': FieldValue.increment(-1)},
-    );
-
-    await batch.commit();
-  }
-
   // ── ANNOUNCEMENTS ─────────────────────────────────────────
 
   Stream<List<Announcement>> getAnnouncements(String role) {
@@ -280,9 +298,12 @@ class FirestoreService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((s) => s.docs
-        .map((d) => Announcement.fromMap(d.data()))
-        .where((a) => a.targetRole == 'all' || a.targetRole == role)
-        .toList());
+            .map((d) => Announcement.fromMap(d.data()))
+            .where((a) {
+              if (role == AppConstants.roleAdmin) return true;
+              return a.targetRole == 'all' || a.targetRole == role;
+            })
+            .toList());
   }
 
   Future<void> postAnnouncement(Announcement announcement) async {

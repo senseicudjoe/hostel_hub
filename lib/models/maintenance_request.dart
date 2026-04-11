@@ -6,6 +6,9 @@ class MaintenanceRequest {
   final String roomId;
   final String title;
   final String description;
+  final String category;
+  final String roomNumber;
+  final String hostelName;
   final List<String> imageUrls;
   final String status; // "pending" | "assigned" | "in_progress" | "resolved"
   final String assignedTo;
@@ -18,6 +21,9 @@ class MaintenanceRequest {
     required this.roomId,
     required this.title,
     required this.description,
+    this.category = 'General',
+    this.roomNumber = '',
+    this.hostelName = '',
     this.imageUrls = const [],
     this.status = 'pending',
     this.assignedTo = '',
@@ -32,6 +38,9 @@ class MaintenanceRequest {
       roomId:      map['roomId'] ?? '',
       title:       map['title'] ?? '',
       description: map['description'] ?? '',
+      category:    map['category'] ?? 'General',
+      roomNumber:  map['roomNumber'] ?? '',
+      hostelName:  map['hostelName'] ?? '',
       imageUrls:   List<String>.from(map['imageUrls'] ?? []),
       status:      map['status'] ?? 'pending',
       assignedTo:  map['assignedTo'] ?? '',
@@ -50,6 +59,9 @@ class MaintenanceRequest {
     'roomId':      roomId,
     'title':       title,
     'description': description,
+    'category':    category,
+    'roomNumber':  roomNumber,
+    'hostelName':  hostelName,
     'imageUrls':   imageUrls,
     'status':      status,
     'assignedTo':  assignedTo,
@@ -68,6 +80,9 @@ class MaintenanceRequest {
       roomId:      roomId,
       title:       title,
       description: description,
+      category:    category,
+      roomNumber:  roomNumber,
+      hostelName:  hostelName,
       imageUrls:   imageUrls ?? this.imageUrls,
       status:      status ?? this.status,
       assignedTo:  assignedTo ?? this.assignedTo,

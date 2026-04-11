@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class RoomModel {
   final String roomId;
   final String hostelName;
@@ -9,6 +7,7 @@ class RoomModel {
   final int currentOccupants;
   final String status; // "available" | "occupied" | "maintenance"
   final String qrCode;
+  final List<String> imageUrls; // Room photos stored in Firebase Storage
 
   RoomModel({
     required this.roomId,
@@ -19,6 +18,7 @@ class RoomModel {
     required this.currentOccupants,
     required this.status,
     required this.qrCode,
+    this.imageUrls = const [],
   });
 
   bool get isAvailable => status == 'available' && currentOccupants < capacity;
@@ -33,6 +33,10 @@ class RoomModel {
       currentOccupants: map['currentOccupants'] ?? 0,
       status:           map['status'] ?? 'available',
       qrCode:           map['qrCode'] ?? '',
+      imageUrls: (map['imageUrls'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
     );
   }
 
@@ -45,5 +49,6 @@ class RoomModel {
     'currentOccupants': currentOccupants,
     'status':           status,
     'qrCode':           qrCode,
+    'imageUrls':        imageUrls,
   };
 }
