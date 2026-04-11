@@ -1,7 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/hostel_assets.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/room_model.dart';
@@ -13,10 +15,50 @@ class ExploreRoomsScreen extends ConsumerStatefulWidget {
   ConsumerState<ExploreRoomsScreen> createState() => _ExploreRoomsScreenState();
 }
 
-class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
-  String _hostelFilter = 'All';
+class _HostelSummary {
+  const _HostelSummary({
+    required this.name,
+    this.assetCoverPath,
+    required this.coverUrl,
+    required this.roomCount,
+  });
 
-  /// When true, list only rooms that can be booked (`RoomModel.isAvailable`).
+  final String name;
+  /// Bundled hero image (preferred over network when set).
+  final String? assetCoverPath;
+  final String? coverUrl;
+  final int roomCount;
+}
+
+List<_HostelSummary> _summarizeHostels(List<RoomModel> rooms) {
+  final map = <String, List<RoomModel>>{};
+  for (final r in rooms) {
+    if (r.hostelName.trim().isEmpty) continue;
+    map.putIfAbsent(r.hostelName, () => []).add(r);
+  }
+  final names = map.keys.toList()..sort();
+  return names.map((name) {
+    final rs = map[name]!;
+    String? url;
+    for (final r in rs) {
+      if (r.imageUrls.isNotEmpty) {
+        url = r.imageUrls.first;
+        break;
+      }
+    }
+    return _HostelSummary(
+      name: name,
+      assetCoverPath: HostelAssets.coverAssetPath(name),
+      coverUrl: url,
+      roomCount: rs.length,
+    );
+  }).toList();
+}
+
+class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
+  /// `null` = show hostel cards only. Non-null = show rooms for this hostel.
+  String? _selectedHostel;
+
   bool _bookableOnly = false;
 
   @override
@@ -26,7 +68,17 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Explore Rooms'),
+        leading: _selectedHostel != null
+            ? IconButton(
+                tooltip: 'All hostels',
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () => setState(() {
+                  _selectedHostel = null;
+                  _bookableOnly = false;
+                }),
+              )
+            : null,
+        title: Text(_selectedHostel ?? 'Explore Rooms'),
         actions: [
           IconButton(
             tooltip: 'Refresh',
@@ -44,36 +96,37 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
           ),
         ),
         data: (rooms) {
-          final hostelNames = rooms.map((r) => r.hostelName).toSet().toList()
-            ..sort();
-          final hostelOptions = <String>['All', ...hostelNames];
-          final effectiveHostel =
-              _hostelFilter == 'All' || hostelNames.contains(_hostelFilter)
-              ? _hostelFilter
-              : 'All';
+          if (rooms.isEmpty) {
+            return const _EmptyHostels();
+          }
 
-          final filtered =
-              rooms.where((r) {
-                if (_bookableOnly && !r.isAvailable) return false;
-                if (effectiveHostel != 'All' &&
-                    r.hostelName != effectiveHostel) {
-                  return false;
-                }
-                return true;
-              }).toList()..sort((a, b) {
-                final h = a.hostelName.compareTo(b.hostelName);
-                if (h != 0) return h;
-                return a.roomNumber.compareTo(b.roomNumber);
-              });
+          if (_selectedHostel == null) {
+            final summaries = _summarizeHostels(rooms);
+            if (summaries.isEmpty) {
+              return const _EmptyHostels();
+            }
+            return _HostelGrid(
+              summaries: summaries,
+              onHostelTap: (name) => setState(() => _selectedHostel = name),
+            );
+          }
+
+          final hostelRooms = rooms
+              .where((r) => r.hostelName == _selectedHostel)
+              .toList()
+            ..sort((a, b) => a.roomNumber.compareTo(b.roomNumber));
+
+          final filtered = hostelRooms.where((r) {
+            if (_bookableOnly && !r.isAvailable) return false;
+            return true;
+          }).toList();
 
           return Column(
             children: [
-              _FiltersBar(
-                hostelFilter: effectiveHostel,
-                hostelOptions: hostelOptions,
+              _BookableFilterBar(
                 bookableOnly: _bookableOnly,
-                onHostelChanged: (v) => setState(() => _hostelFilter = v),
-                onBookableOnlyChanged: (v) => setState(() => _bookableOnly = v),
+                onBookableOnlyChanged: (v) =>
+                    setState(() => _bookableOnly = v),
               ),
               Expanded(
                 child: filtered.isEmpty
@@ -81,7 +134,7 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
                     : ListView.separated(
                         padding: const EdgeInsets.all(16),
                         itemCount: filtered.length,
-                        separatorBuilder: (context, index) =>
+                        separatorBuilder: (context, _) =>
                             const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final room = filtered[index];
@@ -191,20 +244,186 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
   }
 }
 
-class _FiltersBar extends StatelessWidget {
-  final String hostelFilter;
-  final List<String> hostelOptions;
-  final bool bookableOnly;
-  final ValueChanged<String> onHostelChanged;
-  final ValueChanged<bool> onBookableOnlyChanged;
+class _HostelGrid extends StatelessWidget {
+  const _HostelGrid({
+    required this.summaries,
+    required this.onHostelTap,
+  });
 
-  const _FiltersBar({
-    required this.hostelFilter,
-    required this.hostelOptions,
+  final List<_HostelSummary> summaries;
+  final ValueChanged<String> onHostelTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.82,
+      ),
+      itemCount: summaries.length,
+      itemBuilder: (context, i) {
+        final h = summaries[i];
+        return _HostelCard(summary: h, onTap: () => onHostelTap(h.name));
+      },
+    );
+  }
+}
+
+class _HostelCard extends StatelessWidget {
+  const _HostelCard({required this.summary, required this.onTap});
+
+  final _HostelSummary summary;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.cardOf(context),
+      elevation: 0,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (summary.assetCoverPath != null &&
+                      summary.assetCoverPath!.trim().isNotEmpty)
+                    Image.asset(
+                      summary.assetCoverPath!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _HostelPlaceholder(label: summary.name),
+                    )
+                  else if (summary.coverUrl != null &&
+                      summary.coverUrl!.trim().isNotEmpty)
+                    CachedNetworkImage(
+                      imageUrl: summary.coverUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: AppColors.inputOf(context),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => _HostelPlaceholder(
+                        label: summary.name,
+                      ),
+                    )
+                  else
+                    _HostelPlaceholder(label: summary.name),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(10, 24, 10, 10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0),
+                            Colors.black.withValues(alpha: 0.65),
+                          ],
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            summary.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              height: 1.15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${summary.roomCount} room${summary.roomCount == 1 ? '' : 's'}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HostelPlaceholder extends StatelessWidget {
+  const _HostelPlaceholder({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.primaryLight,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.apartment_rounded,
+            size: 48,
+            color: AppColors.primary.withValues(alpha: 0.85),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              label.split(' ').first,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primaryDark,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BookableFilterBar extends StatelessWidget {
+  const _BookableFilterBar({
     required this.bookableOnly,
-    required this.onHostelChanged,
     required this.onBookableOnlyChanged,
   });
+
+  final bool bookableOnly;
+  final ValueChanged<bool> onBookableOnlyChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -217,33 +436,24 @@ class _FiltersBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: DropdownButtonFormField<String>(
-              initialValue: hostelFilter,
-              decoration: const InputDecoration(
-                labelText: 'Hostel',
-                isDense: true,
+            child: Text(
+              'Rooms in this hostel',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textMutedOf(context),
               ),
-              items: hostelOptions
-                  .map((h) => DropdownMenuItem(value: h, child: Text(h)))
-                  .toList(),
-              onChanged: (v) => onHostelChanged(v ?? 'All'),
             ),
           ),
-          const SizedBox(width: 8),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Available',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textMutedOf(context),
-                ),
-              ),
-              Switch(value: bookableOnly, onChanged: onBookableOnlyChanged),
-            ],
+          Text(
+            'Bookable only',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMutedOf(context),
+            ),
           ),
+          Switch(value: bookableOnly, onChanged: onBookableOnlyChanged),
         ],
       ),
     );
@@ -358,8 +568,6 @@ class _RoomCard extends StatelessWidget {
                     onPressed: room.isAvailable && !isCurrentRoom
                         ? onBook
                         : null,
-                    // Override the global Size.fromHeight(52) theme (= Size(∞, 52))
-                    // which causes infinite-width layout inside a Row → blank card.
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(88, 40),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -440,7 +648,7 @@ class _EmptyRooms extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'No rooms found',
+              'No rooms match',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -449,7 +657,45 @@ class _EmptyRooms extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Try changing the hostel filter or showing all rooms.',
+              'Try turning off “Bookable only” or pick another hostel.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textMutedOf(context)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyHostels extends StatelessWidget {
+  const _EmptyHostels();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.apartment_outlined,
+              size: 56,
+              color: AppColors.textHint,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'No hostels to explore yet',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textOf(context),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Rooms will appear here once they are added in Firestore.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textMutedOf(context)),
             ),
