@@ -6,18 +6,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'app.dart';
 import 'firebase_options.dart';
+import 'services/notification_service.dart';
 import 'services/offline_service.dart';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FCM Background handler
-//
-// Must be a top-level function (not inside a class).
-// Called when a push notification arrives while the app is in the background.
-// ─────────────────────────────────────────────────────────────────────────────
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('📩 BG message: ${message.notification?.title}');
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // main()
@@ -41,7 +31,7 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (e) {
     debugPrint('⚠️  Firebase init failed: $e');
   }
