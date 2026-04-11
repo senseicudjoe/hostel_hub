@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -14,6 +15,8 @@ class NotificationService {
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _local =
   FlutterLocalNotificationsPlugin();
+
+  StreamSubscription<String>? _tokenRefreshSub;
 
   static const _channelId   = 'hostelhub_channel';
   static const _channelName = 'HostelHub Notifications';
@@ -85,7 +88,10 @@ class NotificationService {
           .update({'fcmToken': token});
     }
 
-    _fcm.onTokenRefresh.listen((newToken) {
+    // Cancel any existing listener before attaching a new one — prevents
+    // duplicate listeners accumulating across multiple sign-in sessions.
+    await _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = _fcm.onTokenRefresh.listen((newToken) {
       FirebaseFirestore.instance
           .collection(AppConstants.usersCollection)
           .doc(uid)

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import '../providers/app_providers.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/onboarding_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/email_verification_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/student/screens/student_shell_screen.dart';
 import '../../features/student/screens/student_dashboard_screen.dart';
@@ -54,13 +56,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
 
       if (user != null) {
+        final isAdmin = user.role == AppConstants.roleAdmin;
+
+        // ── Email verification gate ────────────────────────────────────────
+        // Students must verify their email before accessing the app.
+        // Admin accounts are provisioned externally and exempt from this check.
+        final emailVerified =
+            FirebaseAuth.instance.currentUser?.emailVerified ?? true;
+        if (!isAdmin && !emailVerified) {
+          return loc == '/verify-email' ? null : '/verify-email';
+        }
+        if (loc == '/verify-email') {
+          return isAdmin ? '/admin' : '/home';
+        }
+        // ──────────────────────────────────────────────────────────────────
+
         if (loc == '/splash' || loc == '/onboarding') {
-          return user.role == AppConstants.roleAdmin ? '/admin' : '/home';
+          return isAdmin ? '/admin' : '/home';
         }
         if (loc == '/login' || loc == '/register') {
-          return user.role == AppConstants.roleAdmin ? '/admin' : '/home';
+          return isAdmin ? '/admin' : '/home';
         }
-        final isAdmin = user.role == AppConstants.roleAdmin;
         if (isAdmin) {
           final onStudentShell = loc == '/home' ||
               loc.startsWith('/room') ||
@@ -81,12 +97,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       final authPublic = loc == '/splash' ||
           loc == '/onboarding' ||
           loc == '/login' ||
-          loc == '/register';
+          loc == '/register' ||
+          loc == '/verify-email';
       if (!authPublic) return '/login';
       return null;
     },
     routes: [
       // ── Auth ──────────────────────────────────────────────────────────────
+      GoRoute(
+        path: '/verify-email',
+        builder: (context, state) => const EmailVerificationScreen(),
+      ),
       GoRoute(
         path: '/splash',
         builder: (context, state) => const SplashScreen(),

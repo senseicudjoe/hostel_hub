@@ -76,6 +76,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final user = await ref.read(authServiceProvider).signInWithGoogle();
+      if (!mounted) return;
+      if (user == null) {
+        // User cancelled the Google picker — do nothing
+        setState(() => _isLoading = false);
+        return;
+      }
+      ref.read(currentUserProvider.notifier).state = user;
+      if (user.role == AppConstants.roleAdmin) {
+        context.go('/admin');
+      } else {
+        context.go('/home');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _forgotPassword(BuildContext context) async {
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
@@ -294,18 +321,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              // ── SSO Button ───────────────────────────────────
-              OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'SSO integration requires Ashesi IdP setup'),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.school_outlined),
-                label: const Text('Sign in with Ashesi SSO'),
+              // ── Google Sign-In ────────────────────────────────
+              _GoogleSignInButton(
+                onPressed: _isLoading ? null : _signInWithGoogle,
               ),
 
               const SizedBox(height: 12),
@@ -328,6 +346,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Google Sign-In Button
+// Follows Google's branding guidelines: white/surface background, Google G logo
+// rendered as coloured text segments, "Sign in with Google" label.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _GoogleSignInButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  const _GoogleSignInButton({this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        backgroundColor: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+        side: BorderSide(
+          color: isDark ? const Color(0xFF444444) : const Color(0xFFDDDDDD),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Google "G" logo — four coloured segments via RichText
+          RichText(
+            text: const TextSpan(
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              children: [
+                TextSpan(text: 'G', style: TextStyle(color: Color(0xFF4285F4))),
+                TextSpan(text: 'o', style: TextStyle(color: Color(0xFFEA4335))),
+                TextSpan(text: 'o', style: TextStyle(color: Color(0xFFFBBC05))),
+                TextSpan(text: 'g', style: TextStyle(color: Color(0xFF4285F4))),
+                TextSpan(text: 'l', style: TextStyle(color: Color(0xFF34A853))),
+                TextSpan(text: 'e', style: TextStyle(color: Color(0xFFEA4335))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Sign in with Google',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : const Color(0xFF3C4043),
+            ),
+          ),
+        ],
       ),
     );
   }

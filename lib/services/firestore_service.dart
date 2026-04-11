@@ -178,22 +178,28 @@ class FirestoreService {
   }
 
   Future<void> deallocateRoom(String allocationId, String studentUid, String roomId) async {
-    final batch = _db.batch();
+    final roomRef = _db.collection(AppConstants.roomsCollection).doc(roomId);
+    final allocRef = _db.collection(AppConstants.allocationsCollection).doc(allocationId);
+    final userRef = _db.collection(AppConstants.usersCollection).doc(studentUid);
 
-    batch.update(
-      _db.collection(AppConstants.allocationsCollection).doc(allocationId),
-      {'status': 'expired'},
-    );
-    batch.update(
-      _db.collection(AppConstants.roomsCollection).doc(roomId),
-      {'currentOccupants': FieldValue.increment(-1)},
-    );
-    batch.update(
-      _db.collection(AppConstants.usersCollection).doc(studentUid),
-      {'hostel': '', 'roomNumber': ''},
-    );
+    await _db.runTransaction((tx) async {
+      final roomSnap = await tx.get(roomRef);
+      final data = roomSnap.data() ?? {};
+      final currentOccupants = (data['currentOccupants'] as int?) ?? 1;
+      final currentStatus = (data['status'] as String?) ?? AppConstants.roomAvailable;
 
-    await batch.commit();
+      // Preserve maintenance status — only restore to available from occupied
+      final newStatus = currentStatus == AppConstants.roomMaintenance
+          ? AppConstants.roomMaintenance
+          : AppConstants.roomAvailable;
+
+      tx.update(allocRef, {'status': 'expired'});
+      tx.update(roomRef, {
+        'currentOccupants': (currentOccupants - 1).clamp(0, 9999),
+        'status': newStatus,
+      });
+      tx.update(userRef, {'hostel': '', 'roomNumber': ''});
+    });
   }
 
   // ── ROOMMATES ─────────────────────────────────────────────
