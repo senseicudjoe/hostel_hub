@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../../core/providers/app_providers.dart';
@@ -50,35 +51,115 @@ class _BiometricSettingsScreenState
     });
   }
 
+  /// Returns true if the current Firebase account uses Google Sign-In and has
+  /// no email/password provider linked (i.e. they signed up with Google only).
+  bool _isGoogleOnlyUser(User firebaseUser) {
+    final providers =
+        firebaseUser.providerData.map((p) => p.providerId).toSet();
+    return providers.contains('google.com') &&
+        !providers.contains('password');
+  }
+
   Future<void> _enableBiometric(BiometricStatus status) async {
     final user = ref.read(currentUserProvider);
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (user == null || firebaseUser == null) return;
 
     if (!status.isSupported) {
-      _showSnackBar(
-        'Biometric authentication is not available on this device.',
-      );
+      _showSnackBar('Biometric authentication is not available on this device.');
       return;
     }
 
+    if (_isGoogleOnlyUser(firebaseUser)) {
+      await _enableBiometricGoogle(firebaseUser, user.email);
+    } else {
+      await _enableBiometricEmail(firebaseUser, user.email);
+    }
+  }
+
+  /// Enable flow for Google Sign-In accounts — re-authenticates via Google
+  /// (no password prompt) then saves a Google credential marker.
+  Future<void> _enableBiometricGoogle(
+    User firebaseUser,
+    String email,
+  ) async {
+    // Capture messenger before any await.
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _isBusy = true);
+
+    try {
+      // Re-authenticate with Google to confirm identity.
+      final googleUser = await GoogleSignIn().signIn();
+      if (!mounted) return;
+      if (googleUser == null) return; // user cancelled
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await firebaseUser.reauthenticateWithCredential(credential);
+      if (!mounted) return;
+
+      // Now prompt the device biometric OS dialog.
+      final authenticated = await ref
+          .read(biometricAuthServiceProvider)
+          .authenticate(
+            localizedReason:
+                'Confirm your identity to enable biometric sign-in for HostelHub',
+          );
+      if (!mounted) return;
+
+      if (!authenticated) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Biometric confirmation was cancelled.')),
+        );
+        return;
+      }
+
+      // Store a Google credential marker (no password).
+      await ref
+          .read(biometricAuthServiceProvider)
+          .saveGoogleCredential(email: email);
+      if (!mounted) return;
+
+      ref.read(biometricEnabledProvider.notifier).setEnabled(true);
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Biometric sign-in is enabled on this device.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      await _refreshStatus();
+    } on FirebaseAuthException catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not verify your Google account: ${e.message ?? e.code}',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
+    }
+  }
+
+  /// Enable flow for email/password accounts — prompts for password and
+  /// re-authenticates before saving credentials.
+  Future<void> _enableBiometricEmail(User firebaseUser, String email) async {
     // Await the dialog before doing anything else — widget may be rebuilt
     // while the dialog is open, so check mounted immediately after.
-    final password = await _promptForPassword(user.email);
+    final password = await _promptForPassword(email);
     if (!mounted) return;
     if (password == null || password.isEmpty) return;
 
     // Capture the messenger NOW, while context is guaranteed to be valid.
-    // Calling ScaffoldMessenger.of(context) after any subsequent await risks
-    // a "deactivated widget ancestor" crash if the OS biometric prompt or
-    // reauthentication call causes a widget-tree rebuild in the background.
     final messenger = ScaffoldMessenger.of(context);
-
     setState(() => _isBusy = true);
 
     try {
       final credential = EmailAuthProvider.credential(
-        email: user.email,
+        email: email,
         password: password,
       );
       await firebaseUser.reauthenticateWithCredential(credential);
@@ -94,16 +175,14 @@ class _BiometricSettingsScreenState
 
       if (!authenticated) {
         messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Biometric confirmation was cancelled.'),
-          ),
+          const SnackBar(content: Text('Biometric confirmation was cancelled.')),
         );
         return;
       }
 
       await ref
           .read(biometricAuthServiceProvider)
-          .saveCredentials(email: user.email, password: password);
+          .saveCredentials(email: email, password: password);
       if (!mounted) return;
 
       ref.read(biometricEnabledProvider.notifier).setEnabled(true);
@@ -120,7 +199,6 @@ class _BiometricSettingsScreenState
         'too-many-requests' => 'Too many attempts. Please wait and try again.',
         _ => 'Could not verify your password. Please try again.',
       };
-      // Use captured messenger — context may be stale in catch after awaits.
       messenger.showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _isBusy = false);

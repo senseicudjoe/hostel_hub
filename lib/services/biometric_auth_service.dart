@@ -17,10 +17,16 @@ class BiometricStatus {
 }
 
 class BiometricCredentials {
-  const BiometricCredentials({required this.email, required this.password});
+  const BiometricCredentials({
+    required this.email,
+    required this.password,
+    this.provider = 'email',
+  });
 
   final String email;
   final String password;
+  /// 'email' for email/password accounts, 'google' for Google Sign-In accounts.
+  final String provider;
 }
 
 class BiometricAuthService {
@@ -30,8 +36,9 @@ class BiometricAuthService {
   }) : _localAuth = localAuth ?? LocalAuthentication(),
        _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
-  static const _emailKey = 'biometric_email';
+  static const _emailKey    = 'biometric_email';
   static const _passwordKey = 'biometric_password';
+  static const _providerKey = 'biometric_provider';
 
   final LocalAuthentication _localAuth;
   final FlutterSecureStorage _secureStorage;
@@ -74,24 +81,35 @@ class BiometricAuthService {
     }
   }
 
+  /// Save email/password credentials for accounts that use email+password auth.
   Future<void> saveCredentials({
     required String email,
     required String password,
   }) async {
-    await _secureStorage.write(key: _emailKey, value: email);
+    await _secureStorage.write(key: _emailKey,    value: email);
     await _secureStorage.write(key: _passwordKey, value: password);
+    await _secureStorage.write(key: _providerKey, value: 'email');
+  }
+
+  /// Save credentials for Google Sign-In accounts (no password stored).
+  Future<void> saveGoogleCredential({required String email}) async {
+    await _secureStorage.write(key: _emailKey,    value: email);
+    await _secureStorage.delete(key: _passwordKey);
+    await _secureStorage.write(key: _providerKey, value: 'google');
   }
 
   Future<BiometricCredentials?> readCredentials() async {
     final email = await _secureStorage.read(key: _emailKey);
-    final password = await _secureStorage.read(key: _passwordKey);
+    if (email == null || email.trim().isEmpty) return null;
 
-    if (email == null ||
-        email.trim().isEmpty ||
-        password == null ||
-        password.isEmpty) {
-      return null;
+    final provider = await _secureStorage.read(key: _providerKey) ?? 'email';
+
+    if (provider == 'google') {
+      return BiometricCredentials(email: email, password: '', provider: 'google');
     }
+
+    final password = await _secureStorage.read(key: _passwordKey);
+    if (password == null || password.isEmpty) return null;
 
     return BiometricCredentials(email: email, password: password);
   }
@@ -110,6 +128,10 @@ class BiometricAuthService {
   ) async {
     final credentials = await readCredentials();
     if (credentials == null) return null;
+
+    if (credentials.provider == 'google') {
+      return authService.signInWithGoogleSilent();
+    }
 
     return authService.login(
       email: credentials.email,
