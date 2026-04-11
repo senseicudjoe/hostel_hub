@@ -42,6 +42,12 @@ final offlineServiceProvider = Provider<OfflineService>(
 
 final currentUserProvider = StateProvider<UserModel?>((ref) => null);
 
+/// Flips to true once SessionBootstrap finishes — whether it found a session,
+/// completed biometrics, or determined no user is signed in.
+/// The splash screen waits for this before navigating so it never races
+/// against an in-progress biometric prompt or Firestore fetch.
+final sessionBootstrapDoneProvider = StateProvider<bool>((ref) => false);
+
 final userRoleProvider = Provider<String>((ref) {
   return ref.watch(currentUserProvider)?.role ?? AppConstants.roleStudent;
 });

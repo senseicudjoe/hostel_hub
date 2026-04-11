@@ -20,10 +20,23 @@ class _BiometricSettingsScreenState
   bool _isBusy = false;
   late Future<BiometricStatus> _statusFuture;
 
+  // Kept at class level so it is never disposed while the dialog's pop
+  // animation is still running.  Disposing a TextEditingController inside
+  // _promptForPassword (right after showDialog returns) caused the crash
+  // because the TextField widget is still alive during the slide-out
+  // animation and tries to add a listener to the already-disposed controller.
+  final _passwordController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _statusFuture = _loadStatus();
+  }
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
   }
 
   Future<BiometricStatus> _loadStatus() {
@@ -174,45 +187,49 @@ class _BiometricSettingsScreenState
   }
 
   Future<String?> _promptForPassword(String email) async {
-    final controller = TextEditingController();
+    // Reset the shared controller before each use.
+    _passwordController.clear();
     var obscureText = true;
 
-    final password = await showDialog<String>(
+    // Wrap content in SingleChildScrollView so the soft keyboard doesn't
+    // overflow the dialog (was causing "RenderFlex overflowed by 99897px").
+    return showDialog<String>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text('Confirm Password'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Enter the password for $email to enable biometric sign-in on this device.',
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    obscureText: obscureText,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      suffixIcon: IconButton(
-                        onPressed: () {
-                          setDialogState(() {
-                            obscureText = !obscureText;
-                          });
-                        },
-                        icon: Icon(
-                          obscureText
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Enter the password for $email to enable biometric sign-in on this device.',
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      // Uses the class-level controller — never disposed
+                      // while the dialog pop-animation is still running.
+                      controller: _passwordController,
+                      obscureText: obscureText,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        suffixIcon: IconButton(
+                          onPressed: () =>
+                              setDialogState(() => obscureText = !obscureText),
+                          icon: Icon(
+                            obscureText
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -221,7 +238,7 @@ class _BiometricSettingsScreenState
                 ),
                 ElevatedButton(
                   onPressed: () =>
-                      Navigator.of(ctx).pop(controller.text.trim()),
+                      Navigator.of(ctx).pop(_passwordController.text.trim()),
                   child: const Text('Continue'),
                 ),
               ],
@@ -230,9 +247,8 @@ class _BiometricSettingsScreenState
         );
       },
     );
-
-    controller.dispose();
-    return password;
+    // No controller.dispose() here — the controller lives with the widget
+    // and is disposed in dispose() above when the screen is finally removed.
   }
 
   void _showSnackBar(String message, {Color? backgroundColor}) {

@@ -7,6 +7,9 @@ import '../providers/app_providers.dart';
 /// Hydrates [currentUserProvider] from Firestore when Firebase Auth has a
 /// session. If the user has enabled biometric login, they are prompted to
 /// authenticate before the session is restored — acting as an app lock.
+///
+/// Always sets [sessionBootstrapDoneProvider] to true when finished,
+/// regardless of outcome, so the splash screen can stop waiting.
 class SessionBootstrap extends ConsumerStatefulWidget {
   const SessionBootstrap({super.key, required this.child});
 
@@ -26,29 +29,44 @@ class _SessionBootstrapState extends ConsumerState<SessionBootstrap> {
   }
 
   Future<void> _hydrateFromFirebase() async {
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) return;
-    if (ref.read(currentUserProvider) != null) return;
+    try {
+      final authUser = FirebaseAuth.instance.currentUser;
 
-    // ── Biometric gate ──────────────────────────────────────────
-    final biometricEnabled = ref.read(biometricEnabledProvider);
-    if (biometricEnabled) {
-      final passed = await _promptBiometric();
-      if (!passed) {
-        // Biometric failed or was cancelled — sign the user out so they
-        // reach the normal login screen instead of the dashboard.
-        await FirebaseAuth.instance.signOut();
-        return;
+      // No Firebase session at all — signal done immediately so the splash
+      // screen doesn't wait indefinitely.
+      if (authUser == null) return;
+      if (ref.read(currentUserProvider) != null) return;
+
+      // ── Biometric gate ──────────────────────────────────────────
+      final biometricEnabled = ref.read(biometricEnabledProvider);
+      if (biometricEnabled) {
+        final passed = await _promptBiometric();
+        if (!passed) {
+          // Biometric failed or cancelled — sign out so the router sends
+          // the user to login.
+          await FirebaseAuth.instance.signOut();
+          return;
+        }
       }
-    }
 
-    // ── Hydrate session ─────────────────────────────────────────
-    final profile = await ref
-        .read(firestoreServiceProvider)
-        .getUser(authUser.uid);
-    if (!mounted || profile == null) return;
-    ref.read(currentUserProvider.notifier).state = profile;
-    await _syncNotifications(profile);
+      // ── Hydrate session ─────────────────────────────────────────
+      final profile = await ref
+          .read(firestoreServiceProvider)
+          .getUser(authUser.uid);
+      if (!mounted || profile == null) return;
+
+      ref.read(currentUserProvider.notifier).state = profile;
+      await _syncNotifications(profile);
+    } finally {
+      // Always signal done — the splash screen is watching this flag.
+      // We use a post-frame callback so the state write happens outside any
+      // ongoing build phase.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(sessionBootstrapDoneProvider.notifier).state = true;
+        }
+      });
+    }
   }
 
   Future<bool> _promptBiometric() async {
@@ -70,6 +88,9 @@ class _SessionBootstrapState extends ConsumerState<SessionBootstrap> {
       await n.initialize();
       await n.saveFcmToken(user.uid);
       await n.subscribeToRole(user.role);
+
+      // Fire the one-time welcome notification 5 s after the very first sign-in.
+      await n.showWelcomeNotificationIfNeeded(user.name);
     } catch (_) {}
   }
 

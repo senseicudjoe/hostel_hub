@@ -11,6 +11,15 @@ class UserModel {
   final String fcmToken;
   final DateTime createdAt;
 
+  // ── Profile setup fields (collected during onboarding) ──────────────────
+  final bool setupComplete;
+  final String studentId;       // e.g. "AS/0123/24"
+  final String phone;           // e.g. "+233 20 123 4567"
+  final int yearOfStudy;        // 1–4, 0 = not set
+  final String programme;       // e.g. "Computer Science"
+  final String emergencyName;   // emergency contact full name
+  final String emergencyPhone;  // emergency contact phone
+
   UserModel({
     required this.uid,
     required this.name,
@@ -21,6 +30,13 @@ class UserModel {
     this.profileImageUrl = '',
     this.fcmToken = '',
     required this.createdAt,
+    this.setupComplete = false,
+    this.studentId = '',
+    this.phone = '',
+    this.yearOfStudy = 0,
+    this.programme = '',
+    this.emergencyName = '',
+    this.emergencyPhone = '',
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
@@ -36,6 +52,18 @@ class UserModel {
       createdAt: map['createdAt'] is Timestamp
           ? (map['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
+      // If the field is absent this is a pre-existing account that predates the
+      // setup flow — treat it as already complete so they aren't gated.
+      // Only brand-new registrations have setupComplete explicitly set to false.
+      setupComplete: map.containsKey('setupComplete')
+          ? (map['setupComplete'] as bool? ?? false)
+          : true,
+      studentId:      map['studentId'] ?? '',
+      phone:          map['phone'] ?? '',
+      yearOfStudy:    (map['yearOfStudy'] as num?)?.toInt() ?? 0,
+      programme:      map['programme'] ?? '',
+      emergencyName:  map['emergencyName'] ?? '',
+      emergencyPhone: map['emergencyPhone'] ?? '',
     );
   }
 
@@ -49,6 +77,13 @@ class UserModel {
     'profileImageUrl': profileImageUrl,
     'fcmToken':        fcmToken,
     'createdAt':       createdAt,
+    'setupComplete':   setupComplete,
+    'studentId':       studentId,
+    'phone':           phone,
+    'yearOfStudy':     yearOfStudy,
+    'programme':       programme,
+    'emergencyName':   emergencyName,
+    'emergencyPhone':  emergencyPhone,
   };
 
   UserModel copyWith({
@@ -57,6 +92,13 @@ class UserModel {
     String? roomNumber,
     String? profileImageUrl,
     String? fcmToken,
+    bool? setupComplete,
+    String? studentId,
+    String? phone,
+    int? yearOfStudy,
+    String? programme,
+    String? emergencyName,
+    String? emergencyPhone,
   }) {
     return UserModel(
       uid:             uid,
@@ -68,6 +110,13 @@ class UserModel {
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       fcmToken:        fcmToken ?? this.fcmToken,
       createdAt:       createdAt,
+      setupComplete:   setupComplete ?? this.setupComplete,
+      studentId:       studentId ?? this.studentId,
+      phone:           phone ?? this.phone,
+      yearOfStudy:     yearOfStudy ?? this.yearOfStudy,
+      programme:       programme ?? this.programme,
+      emergencyName:   emergencyName ?? this.emergencyName,
+      emergencyPhone:  emergencyPhone ?? this.emergencyPhone,
     );
   }
 }

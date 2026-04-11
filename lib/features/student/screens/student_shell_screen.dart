@@ -60,26 +60,35 @@ class StudentShell extends StatelessWidget {
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home_rounded),
               label: 'Home',
+              // tooltip: '' disables the long-press tooltip. Without this,
+              // Flutter tries to show a Tooltip using an Overlay that isn't
+              // reachable from the bottomNavigationBar slot inside a nested
+              // go_router shell, causing a "No Overlay widget found" crash.
+              tooltip: '',
             ),
             NavigationDestination(
               icon: Icon(Icons.search_outlined),
               selectedIcon: Icon(Icons.search_rounded),
               label: 'Explore',
+              tooltip: '',
             ),
             NavigationDestination(
               icon: Icon(Icons.meeting_room_outlined),
               selectedIcon: Icon(Icons.meeting_room_rounded),
               label: 'My Room',
+              tooltip: '',
             ),
             NavigationDestination(
               icon: Icon(Icons.build_outlined),
               selectedIcon: Icon(Icons.build_rounded),
               label: 'Requests',
+              tooltip: '',
             ),
             NavigationDestination(
               icon: Icon(Icons.person_outline),
               selectedIcon: Icon(Icons.person_rounded),
               label: 'Profile',
+              tooltip: '',
             ),
           ],
         ),
