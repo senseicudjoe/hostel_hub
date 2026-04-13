@@ -105,13 +105,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (isAdmin) {
           final onStudentShell =
               loc == '/home' ||
+              loc == '/explore' ||
               loc.startsWith('/room') ||
               (loc.startsWith('/maintenance') && !loc.startsWith('/admin')) ||
               loc == '/profile' ||
               loc.startsWith('/profile/') ||
-              loc == '/home/announcements';
+              loc.startsWith('/home/');
           if (onStudentShell) {
-            return loc == '/home/announcements'
+            return loc.startsWith('/home/announcements')
                 ? '/admin/announcements'
                 : '/admin';
           }
