@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/cache/app_image_caches.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
@@ -52,10 +54,7 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.go('/home'),
-        ),
+        automaticallyImplyLeading: false,
         title: const Text('Maintenance'),
       ),
       body: Column(
@@ -281,6 +280,71 @@ class _RequestCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (request.imageUrls.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 48,
+                        child: Row(
+                          children: [
+                            for (final url in request.imageUrls.take(3))
+                              Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: CachedNetworkImage(
+                                    imageUrl: url,
+                                    cacheManager: AppImageCaches.maintenance,
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => Container(
+                                      width: 48,
+                                      height: 48,
+                                      color: AppColors.primaryLight,
+                                      child: const Center(
+                                        child: SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    errorWidget: (context, url, error) => Container(
+                                      width: 48,
+                                      height: 48,
+                                      color: AppColors.input,
+                                      child: const Icon(
+                                        Icons.broken_image_outlined,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (request.imageUrls.length > 3)
+                              Container(
+                                width: 48,
+                                height: 48,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: AppColors.input,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '+${request.imageUrls.length - 3}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textMutedOf(context),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

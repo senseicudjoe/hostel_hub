@@ -207,6 +207,36 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/room',
                 builder: (context, state) => const MyRoomScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'gallery',
+                    builder: (context, state) {
+                      final extra = state.extra;
+                      if (extra is! RoomPhotoGalleryExtra) {
+                        return Scaffold(
+                          appBar: AppBar(title: const Text('Photos')),
+                          body: const Center(
+                            child: Text('Nothing to show.'),
+                          ),
+                        );
+                      }
+                      final urls = extra.imageUrls;
+                      if (urls.isEmpty) {
+                        return Scaffold(
+                          appBar: AppBar(title: const Text('Photos')),
+                          body: const Center(
+                            child: Text('Nothing to show.'),
+                          ),
+                        );
+                      }
+                      final i = extra.initialIndex.clamp(0, urls.length - 1);
+                      return RoomPhotoGalleryScreen(
+                        imageUrls: urls,
+                        initialIndex: i,
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),

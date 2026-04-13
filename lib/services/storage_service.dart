@@ -1,6 +1,9 @@
 import 'dart:io';
+
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+
 import '../core/constants/app_constants.dart';
 
 class StorageService {
@@ -31,38 +34,62 @@ class StorageService {
 
   // ── Upload helpers ────────────────────────────────────────
 
-  Future<String?> uploadProfileImage(String uid, File file) async {
+  /// Stores under `profile_images/{uid}/{uid}_{yyyyMMdd_HHmmss}_{ms}.jpg`.
+  /// Optionally removes [replacePreviousDownloadUrl] after a successful upload
+  /// (e.g. old profile photo in the same bucket).
+  Future<String?> uploadProfileImage(
+    String uid,
+    File file, {
+    String? replacePreviousDownloadUrl,
+  }) async {
     try {
+      final now = DateTime.now();
+      final human = DateFormat('yyyyMMdd_HHmmss').format(now);
+      final fileName = '${uid}_${human}_${now.millisecondsSinceEpoch}.jpg';
       final ref = _storage.ref(
-        '${AppConstants.profileImagesPath}/$uid/profile.jpg',
+        '${AppConstants.profileImagesPath}/$uid/$fileName',
       );
       final task = await ref.putFile(
         file,
         SettableMetadata(contentType: 'image/jpeg'),
       );
-      return await task.ref.getDownloadURL();
+      final url = await task.ref.getDownloadURL();
+      if (replacePreviousDownloadUrl != null &&
+          replacePreviousDownloadUrl.isNotEmpty &&
+          replacePreviousDownloadUrl != url) {
+        await deleteFile(replacePreviousDownloadUrl);
+      }
+      return url;
     } on FirebaseException catch (e) {
       throw 'Failed to upload profile image: ${e.message}';
     }
   }
 
+  /// Stores under `maintenance_images/{studentUid}/{requestId}_{yyyyMMdd_HHmmss}_{ms}_{i}.jpg`.
+  /// Throws if any file fails so callers do not save a request with missing URLs.
   Future<List<String>> uploadMaintenanceImages(
-      String requestId,
-      List<File> files,
-      ) async {
+    String studentUid,
+    String requestId,
+    List<File> files,
+  ) async {
+    if (files.isEmpty) return [];
     final urls = <String>[];
-    for (int i = 0; i < files.length; i++) {
+    final batch = DateTime.now();
+    final human = DateFormat('yyyyMMdd_HHmmss').format(batch);
+    final ms = batch.millisecondsSinceEpoch;
+    for (var i = 0; i < files.length; i++) {
+      final fileName = '${requestId}_${human}_${ms}_$i.jpg';
+      final ref = _storage.ref(
+        '${AppConstants.maintenanceImagesPath}/$studentUid/$fileName',
+      );
       try {
-        final ref = _storage.ref(
-          '${AppConstants.maintenanceImagesPath}/$requestId/image_$i.jpg',
-        );
         final task = await ref.putFile(
           files[i],
           SettableMetadata(contentType: 'image/jpeg'),
         );
         urls.add(await task.ref.getDownloadURL());
-      } catch (_) {
-        // Skip failed uploads silently
+      } on FirebaseException catch (e) {
+        throw 'Failed to upload maintenance photo ${i + 1}: ${e.message}';
       }
     }
     return urls;

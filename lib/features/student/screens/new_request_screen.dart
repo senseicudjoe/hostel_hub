@@ -127,7 +127,7 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
       if (_pickedFiles.isNotEmpty) {
         imageUrls = await ref
             .read(storageServiceProvider)
-            .uploadMaintenanceImages(requestId, _pickedFiles);
+            .uploadMaintenanceImages(user.uid, requestId, _pickedFiles);
       }
 
       final now = DateTime.now();

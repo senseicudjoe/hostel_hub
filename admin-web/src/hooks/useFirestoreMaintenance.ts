@@ -5,6 +5,11 @@ import { COLLECTIONS } from "../config/constants";
 import { parseFirestoreDate } from "../lib/timestamp";
 import type { MaintenanceRow } from "../types/models";
 
+function parseStringArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === "string" && x.length > 0);
+}
+
 function mapMaintenance(
   docId: string,
   data: Record<string, unknown>,
@@ -22,6 +27,7 @@ function mapMaintenance(
     hostelName: String(data.hostelName ?? ""),
     roomNumber: String(data.roomNumber ?? ""),
     createdAt: parseFirestoreDate(data.createdAt),
+    imageUrls: parseStringArray(data.imageUrls),
   };
 }
 

@@ -86,7 +86,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         foregroundColor: AppColors.textOf(context),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.go('/login'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: SafeArea(

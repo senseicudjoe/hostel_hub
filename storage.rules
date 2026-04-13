@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Profile photos live under profile_images/{uid}/… — only that user may write.
+    match /profile_images/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Maintenance photos: same pattern as profiles — scoped by uploader uid.
+    match /maintenance_images/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write, delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

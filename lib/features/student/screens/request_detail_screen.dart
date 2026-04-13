@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/cache/app_image_caches.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
@@ -134,7 +135,7 @@ Widget _detailBody(
 
   return Scaffold(
     appBar: AppBar(
-      title: Text(req.requestId),
+      title: Text(req.title),
     ),
     body: RefreshIndicator(
       onRefresh: () =>
@@ -201,10 +202,11 @@ Widget _detailBody(
                           borderRadius: BorderRadius.circular(10),
                           child: CachedNetworkImage(
                             imageUrl: url,
+                            cacheManager: AppImageCaches.maintenance,
                             width: 100,
                             height: 100,
                             fit: BoxFit.cover,
-                            placeholder: (_, __) => Container(
+                            placeholder: (context, url) => Container(
                               width: 100,
                               height: 100,
                               color: AppColors.primaryLight,
@@ -218,7 +220,7 @@ Widget _detailBody(
                                 ),
                               ),
                             ),
-                            errorWidget: (_, __, ___) => Container(
+                            errorWidget: (context, url, error) => Container(
                               width: 100,
                               height: 100,
                               color: AppColors.input,

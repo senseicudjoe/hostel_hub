@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/hostel_assets.dart';
@@ -73,6 +72,7 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         leading: _selectedHostel != null
             ? IconButton(
                 tooltip: 'All hostels',
@@ -82,11 +82,7 @@ class _ExploreRoomsScreenState extends ConsumerState<ExploreRoomsScreen> {
                   _bookableOnly = false;
                 }),
               )
-            : IconButton(
-                tooltip: 'Home',
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => context.go('/home'),
-              ),
+            : null,
         title: Text(_selectedHostel ?? 'Explore Rooms'),
         actions: [
           IconButton(

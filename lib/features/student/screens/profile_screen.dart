@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/cache/app_image_caches.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
@@ -54,7 +55,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               email: user?.email ?? '—',
               tag: isAdmin
                   ? 'SLE Administrator'
-                  : '${user?.hostel ?? ''} · Room ${user?.roomNumber ?? ''}',
+                  : (user?.hostel ?? '').trim().isNotEmpty
+                      ? '${user!.hostel} · Room ${user.roomNumber}'
+                      : 'No room assigned',
               isAdmin: isAdmin,
               profileImageUrl: user?.profileImageUrl,
               onEditTap: () => _showEditProfileSheet(context),
@@ -379,6 +382,46 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
       .map((w) => w[0].toUpperCase())
       .join();
 
+  Future<void> _pickPhoto({required bool fromCamera}) async {
+    final file = await ref.read(storageServiceProvider).pickImage(
+          fromCamera: fromCamera,
+        );
+    if (file != null && mounted) setState(() => _pickedFile = file);
+  }
+
+  Future<void> _showPhotoSourcePicker() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.cardOf(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take photo'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                await _pickPhoto(fromCamera: true);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                await _pickPhoto(fromCamera: false);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _onSave() async {
     final newName = _nameController.text.trim();
     if (newName.isEmpty) return;
@@ -387,9 +430,12 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     try {
       String? newImageUrl;
       if (_pickedFile != null) {
-        newImageUrl = await ref
-            .read(storageServiceProvider)
-            .uploadProfileImage(u.uid, _pickedFile!);
+        newImageUrl = await ref.read(storageServiceProvider).uploadProfileImage(
+              u.uid,
+              _pickedFile!,
+              replacePreviousDownloadUrl:
+                  u.profileImageUrl.isNotEmpty ? u.profileImageUrl : null,
+            );
       }
       final updates = <String, dynamic>{
         'name': newName,
@@ -440,74 +486,93 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
               ),
             ),
             const SizedBox(height: 24),
-            GestureDetector(
-              onTap: () async {
-                final file = await ref.read(storageServiceProvider).pickImage();
-                if (file != null) setState(() => _pickedFile = file);
-              },
-              child: Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  CircleAvatar(
-                    radius: 44,
-                    backgroundColor: AppColors.primaryLight,
-                    child: _pickedFile != null
-                        ? ClipOval(
-                            child: Image.file(
-                              _pickedFile!,
-                              width: 88,
-                              height: 88,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : (u.profileImageUrl.isNotEmpty
-                            ? ClipOval(
-                                child: CachedNetworkImage(
-                                  imageUrl: u.profileImageUrl,
-                                  width: 88,
-                                  height: 88,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, _, _) => Text(
-                                    _initials,
-                                    style: const TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.primary,
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _showPhotoSourcePicker,
+                borderRadius: BorderRadius.circular(52),
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    CircleAvatar(
+                      radius: 44,
+                      backgroundColor: AppColors.primaryLight,
+                      child: _pickedFile != null
+                          ? ClipOval(
+                              child: Image.file(
+                                _pickedFile!,
+                                width: 88,
+                                height: 88,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : (u.profileImageUrl.isNotEmpty
+                              ? ClipOval(
+                                  child: CachedNetworkImage(
+                                    imageUrl: u.profileImageUrl,
+                                    cacheManager: AppImageCaches.profile,
+                                    width: 88,
+                                    height: 88,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, _, _) => Text(
+                                      _initials,
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.primary,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              )
-                            : Text(
-                                _initials,
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
-                                ),
-                              )),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
+                                )
+                              : Text(
+                                  _initials,
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                )),
                     ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      color: Colors.white,
-                      size: 14,
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.add_a_photo_rounded,
+                        color: Colors.white,
+                        size: 14,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Tap to change photo',
+              'Tap to take a photo or pick from gallery',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textMutedOf(context),
               ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: () => _pickPhoto(fromCamera: true),
+                  icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                  label: const Text('Camera'),
+                ),
+                TextButton.icon(
+                  onPressed: () => _pickPhoto(fromCamera: false),
+                  icon: const Icon(Icons.photo_library_outlined, size: 18),
+                  label: const Text('Gallery'),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             TextField(
@@ -593,13 +658,14 @@ class _ProfileHeader extends StatelessWidget {
                       ? ClipOval(
                           child: CachedNetworkImage(
                             imageUrl: profileImageUrl!,
+                            cacheManager: AppImageCaches.profile,
                             width: 88,
                             height: 88,
                             fit: BoxFit.cover,
-                            placeholder: (_, __) =>
+                            placeholder: (context, url) =>
                                 const CircularProgressIndicator(
                                     strokeWidth: 2),
-                            errorWidget: (_, __, ___) => Text(
+                            errorWidget: (context, url, error) => Text(
                               initials,
                               style: const TextStyle(
                                 fontSize: 28,

@@ -268,6 +268,32 @@ export function MaintenancePage() {
                         <p className="whitespace-pre-wrap leading-relaxed">
                           {r.description.trim() ? r.description : "—"}
                         </p>
+                        {r.imageUrls.length > 0 ? (
+                          <>
+                            <p className="mb-2 mt-4 text-xs font-bold uppercase tracking-wide text-ink-muted">
+                              Attached photos
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {r.imageUrls.map((url, i) => (
+                                <a
+                                  key={`${r.requestId}-${i}`}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <img
+                                    src={url}
+                                    alt=""
+                                    className="h-24 w-24 rounded-lg border border-line object-cover"
+                                    loading="lazy"
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                          </>
+                        ) : null}
                         {(r.hostelName || r.roomNumber) ? (
                           <p className="mt-3 text-xs text-ink-muted">
                             {[r.hostelName, r.roomNumber].filter(Boolean).join(" · ")}

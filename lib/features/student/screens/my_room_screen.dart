@@ -3,12 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/cache/app_image_caches.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/room_model.dart';
 import '../../../models/user_model.dart';
+
+/// Passed as [GoRouterState.extra] when opening [RoomPhotoGalleryScreen].
+class RoomPhotoGalleryExtra {
+  final List<String> imageUrls;
+  final int initialIndex;
+
+  const RoomPhotoGalleryExtra({
+    required this.imageUrls,
+    required this.initialIndex,
+  });
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S-04 — My Room Screen
@@ -28,10 +40,7 @@ class MyRoomScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.go('/home'),
-        ),
+        automaticallyImplyLeading: false,
         title: const Text('My Room'),
       ),
       body: !hasRoom
@@ -415,29 +424,32 @@ class _RoomPhotosCard extends StatelessWidget {
   }
 
   void _showFullScreen(BuildContext context, int initial) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => _FullScreenGallery(
-          imageUrls: imageUrls,
-          initialIndex: initial,
-        ),
+    context.push(
+      '/room/gallery',
+      extra: RoomPhotoGalleryExtra(
+        imageUrls: imageUrls,
+        initialIndex: initial,
       ),
     );
   }
 }
 
-class _FullScreenGallery extends StatefulWidget {
+/// Full-screen swipe gallery for room photos (opened via go_router).
+class RoomPhotoGalleryScreen extends StatefulWidget {
   final List<String> imageUrls;
   final int initialIndex;
-  const _FullScreenGallery(
-      {required this.imageUrls, required this.initialIndex});
+
+  const RoomPhotoGalleryScreen({
+    super.key,
+    required this.imageUrls,
+    required this.initialIndex,
+  });
 
   @override
-  State<_FullScreenGallery> createState() => _FullScreenGalleryState();
+  State<RoomPhotoGalleryScreen> createState() => _RoomPhotoGalleryScreenState();
 }
 
-class _FullScreenGalleryState extends State<_FullScreenGallery> {
+class _RoomPhotoGalleryScreenState extends State<RoomPhotoGalleryScreen> {
   late final PageController _controller;
   late int _current;
 
@@ -467,7 +479,7 @@ class _FullScreenGalleryState extends State<_FullScreenGallery> {
         controller: _controller,
         itemCount: widget.imageUrls.length,
         onPageChanged: (i) => setState(() => _current = i),
-        itemBuilder: (_, i) => InteractiveViewer(
+        itemBuilder: (context, i) => InteractiveViewer(
           child: Center(
             child: CachedNetworkImage(
               imageUrl: widget.imageUrls[i],
@@ -548,7 +560,10 @@ class _RoommateRow extends StatelessWidget {
             radius: 20,
             backgroundColor: AppColors.primaryLight,
             backgroundImage: roommate.profileImageUrl.isNotEmpty
-                ? CachedNetworkImageProvider(roommate.profileImageUrl)
+                ? CachedNetworkImageProvider(
+                    roommate.profileImageUrl,
+                    cacheManager: AppImageCaches.profile,
+                  )
                 : null,
             child: roommate.profileImageUrl.isEmpty
                 ? Text(

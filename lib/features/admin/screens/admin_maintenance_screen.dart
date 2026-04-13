@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/utils/async_refresh.dart';
+import '../../../core/cache/app_image_caches.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/maintenance_request.dart';
 import '../../../shared/widgets/status_chip.dart';
@@ -271,15 +272,17 @@ class _RequestTile extends StatelessWidget {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: request.imageUrls.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) => ClipRRect(
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 8),
+                  itemBuilder: (context, i) => ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: CachedNetworkImage(
                       imageUrl: request.imageUrls[i],
+                      cacheManager: AppImageCaches.maintenance,
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(
+                      placeholder: (context, url) => Container(
                         width: 80,
                         height: 80,
                         color: AppColors.inputOf(context),
@@ -291,7 +294,7 @@ class _RequestTile extends StatelessWidget {
                           ),
                         ),
                       ),
-                      errorWidget: (_, __, ___) => Container(
+                      errorWidget: (context, url, error) => Container(
                         width: 80,
                         height: 80,
                         color: AppColors.inputOf(context),

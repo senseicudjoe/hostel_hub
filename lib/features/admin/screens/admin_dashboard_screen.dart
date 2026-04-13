@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/time_of_day_greeting.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
@@ -46,7 +47,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             children: [
             // ── Greeting ──────────────────────────────────────
             Text(
-              'Good morning, ${user?.name.split(' ').first ?? 'Admin'}',
+              '${timeOfDayGreeting(DateTime.now().hour)}, ${user?.name.split(' ').first ?? 'Admin'}',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,

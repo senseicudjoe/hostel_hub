@@ -21,4 +21,5 @@ export interface MaintenanceRow {
   hostelName: string;
   roomNumber: string;
   createdAt: Date;
+  imageUrls: string[];
 }

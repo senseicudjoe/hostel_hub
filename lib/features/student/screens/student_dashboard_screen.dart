@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../models/announcement.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/time_of_day_greeting.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/utils/async_refresh.dart';
 import '../../../core/theme/app_theme.dart';
@@ -25,8 +26,6 @@ class StudentDashboardScreen extends ConsumerStatefulWidget {
 
 class _StudentDashboardScreenState
     extends ConsumerState<StudentDashboardScreen> {
-  int _tickerIndex = 0;
-
   String _friendlyAnnouncementError(Object error) {
     final message = error.toString().toLowerCase();
     if (message.contains('permission-denied')) {
@@ -43,7 +42,7 @@ class _StudentDashboardScreenState
     );
     final firstName = user?.name.split(' ').first ?? 'Student';
     final now = DateTime.now();
-    final greeting = _greeting(now.hour);
+    final greeting = timeOfDayGreeting(now.hour);
     final dateStr = DateFormat('EEEE, d MMMM').format(now);
 
     return Scaffold(
@@ -176,12 +175,9 @@ class _StudentDashboardScreenState
                       );
                     }
                     final ticker = list.map((a) => '📢 ${a.title}').toList();
-                    final i = _tickerIndex % ticker.length;
                     return _AnnouncementTicker(
-                      message: ticker[i],
-                      onTap: () => setState(() {
-                        _tickerIndex = (_tickerIndex + 1) % ticker.length;
-                      }),
+                      message: ticker.first,
+                      onTap: () => context.go('/home/announcements'),
                     );
                   },
                   loading: () => const Padding(
@@ -197,7 +193,7 @@ class _StudentDashboardScreenState
                 ),
 
                 const SizedBox(height: 12),
-                ..._announcementPreviews(announcementsAsync),
+                ..._announcementPreviews(context, announcementsAsync),
                 const SizedBox(height: 20),
               ]),
             ),
@@ -208,14 +204,8 @@ class _StudentDashboardScreenState
     );
   }
 
-  // Returns a time-appropriate greeting string.
-  String _greeting(int hour) {
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
-
   List<Widget> _announcementPreviews(
+    BuildContext context,
     AsyncValue<List<Announcement>> announcementsAsync,
   ) {
     return announcementsAsync.maybeWhen(
@@ -225,11 +215,15 @@ class _StudentDashboardScreenState
           final date = DateFormat('MMM d').format(a.createdAt);
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: _AnnouncementPreviewCard(
-              title: a.title,
-              body: a.body,
-              date: date,
-              isUnread: false,
+            child: GestureDetector(
+              onTap: () => context.go('/home/announcements'),
+              behavior: HitTestBehavior.opaque,
+              child: _AnnouncementPreviewCard(
+                title: a.title,
+                body: a.body,
+                date: date,
+                isUnread: false,
+              ),
             ),
           );
         }).toList();
