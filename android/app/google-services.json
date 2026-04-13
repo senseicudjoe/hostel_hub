@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "619553419913-jh5fq0ieae51vv3ufehvqebvo18sf36t.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.hostel_hub",
+            "certificate_hash": "8f74a3463046d1477d033551a2fa40007d91cf07"
+          }
+        },
+        {
           "client_id": "619553419913-ov646ha9a8fs9ftv2lu3m57jdktstm8n.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -60,4 +68,4 @@
     }
   ],
   "configuration_version": "1"
-} 
+}
