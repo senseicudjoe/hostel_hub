@@ -44,3 +44,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 docs/HOSTELHUB_DOCUMENTATION.md
+
+# Android signing secrets — never commit these
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
+
+# Release APKs — share via Drive/Telegram, not git
+/release/
