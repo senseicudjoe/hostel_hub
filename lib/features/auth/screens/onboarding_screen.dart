@@ -39,13 +39,6 @@ const _slides = [
         'Browse available rooms, secure your spot in your preferred hostel, and manage your booking from your phone.',
     color: Color(0xFF1565C0),
   ),
-  _Slide(
-    icon: Icons.apartment_rounded,
-    title: 'Your Room, Your Hub',
-    subtitle:
-        'View hostel details, scan room QR codes, and stay connected with official announcements.',
-    color: Color(0xFF2E7D32),
-  ),
 ];
 
 class OnboardingScreen extends StatefulWidget {
