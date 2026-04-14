@@ -15,6 +15,8 @@ class HostelHubApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+    // Activate the offline sync listener for the lifetime of the app.
+    ref.watch(offlineSyncProvider);
 
     return MaterialApp.router(
       title: 'HostelHub',

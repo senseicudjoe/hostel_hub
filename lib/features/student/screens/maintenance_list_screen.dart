@@ -59,6 +59,9 @@ class _MaintenanceListScreenState extends ConsumerState<MaintenanceListScreen>
       ),
       body: Column(
         children: [
+          // Offline queue banner — visible when requests are waiting to sync
+          const _PendingSyncBanner(),
+
           // Tab bar strip — sits below the AppBar
           Container(
             color: AppColors.cardOf(context),
@@ -369,5 +372,68 @@ class _RequestCard extends StatelessWidget {
       default:
         return Icons.build_rounded;
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pending Sync Banner
+//
+// Shown at the top of the list when there are requests in the offline queue.
+// Disappears automatically once the queue is flushed.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PendingSyncBanner extends ConsumerWidget {
+  const _PendingSyncBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(pendingRequestCountProvider);
+    final isOnlineAsync = ref.watch(isOnlineProvider);
+    final isOnline = isOnlineAsync.value ?? true;
+
+    if (count == 0) return const SizedBox.shrink();
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: Container(
+        key: ValueKey(count),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        color: isOnline
+            ? AppColors.success.withValues(alpha: 0.12)
+            : AppColors.warning.withValues(alpha: 0.12),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: isOnline
+                  ? const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.success,
+                    )
+                  : const Icon(
+                      Icons.cloud_off_rounded,
+                      size: 16,
+                      color: AppColors.warning,
+                    ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                isOnline
+                    ? 'Syncing $count offline ${count == 1 ? 'request' : 'requests'}…'
+                    : '$count ${count == 1 ? 'request' : 'requests'} queued — will sync when back online',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isOnline ? AppColors.success : AppColors.warning,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

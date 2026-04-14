@@ -59,6 +59,9 @@ dependencies:
   # Push Notifications
   flutter_local_notifications: ^17.0.0
 
+  # Connectivity detection (offline sync)
+  connectivity_plus: ^6.0.0
+
   # Ambient light sensor (Android)
   light: 5.0.0
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,6 +38,46 @@ final notificationServiceProvider = Provider<NotificationService>(
 final offlineServiceProvider = Provider<OfflineService>(
   (_) => OfflineService(),
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONNECTIVITY — live network status + auto-flush on reconnect
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// True when the device has at least one active network interface.
+final isOnlineProvider = StreamProvider<bool>((ref) {
+  return Connectivity()
+      .onConnectivityChanged
+      .map((results) => results.any((r) => r != ConnectivityResult.none));
+});
+
+/// Tracks how many requests are waiting in the offline queue.
+/// Updated by [offlinePendingCountProvider] after each flush or save.
+final pendingRequestCountProvider = StateProvider<int>((ref) {
+  return ref.read(offlineServiceProvider).pendingCount;
+});
+
+/// Watches connectivity and automatically flushes the offline queue when
+/// the device comes back online.
+final offlineSyncProvider = Provider<void>((ref) {
+  ref.listen<AsyncValue<bool>>(isOnlineProvider, (previous, next) async {
+    final wasOffline = previous?.value == false || previous == null;
+    final isNowOnline = next.value == true;
+
+    if (wasOffline && isNowOnline) {
+      final offline = ref.read(offlineServiceProvider);
+      if (!offline.hasPendingRequests) return;
+
+      final firestore = ref.read(firestoreServiceProvider);
+      final flushed = await offline.flush(firestore);
+
+      if (flushed > 0) {
+        // Update the badge count after flush.
+        ref.read(pendingRequestCountProvider.notifier).state =
+            offline.pendingCount;
+      }
+    }
+  });
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SESSION USER

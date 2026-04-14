@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -114,47 +115,91 @@ class _NewRequestScreenState extends ConsumerState<NewRequestScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final fs = ref.read(firestoreServiceProvider);
-      final alloc = await fs.getStudentAllocation(user.uid);
-      final roomId =
-          alloc?['roomId'] as String? ?? 'unassigned_${user.uid}';
+      // Check connectivity before attempting any network calls.
+      final connectivity = await Connectivity().checkConnectivity();
+      final isOnline =
+          connectivity.any((r) => r != ConnectivityResult.none);
 
+      final fs = ref.read(firestoreServiceProvider);
       final requestId =
           'req_${_uuid.v4().replaceAll('-', '').substring(0, 12)}';
+      final now = DateTime.now();
 
-      // Upload any picked images and get their download URLs
-      List<String> imageUrls = [];
-      if (_pickedFiles.isNotEmpty) {
-        imageUrls = await ref
-            .read(storageServiceProvider)
-            .uploadMaintenanceImages(user.uid, requestId, _pickedFiles);
+      if (isOnline) {
+        // ── Online path — normal submit with image upload ──────────────
+        final alloc = await fs.getStudentAllocation(user.uid);
+        final roomId =
+            alloc?['roomId'] as String? ?? 'unassigned_${user.uid}';
+
+        List<String> imageUrls = [];
+        if (_pickedFiles.isNotEmpty) {
+          imageUrls = await ref
+              .read(storageServiceProvider)
+              .uploadMaintenanceImages(user.uid, requestId, _pickedFiles);
+        }
+
+        final request = MaintenanceRequest(
+          requestId: requestId,
+          studentUid: user.uid,
+          roomId: roomId,
+          title: _titleController.text.trim(),
+          description: _descController.text.trim(),
+          category: _selectedCategory ?? 'General',
+          roomNumber: user.roomNumber,
+          hostelName: user.hostel,
+          imageUrls: imageUrls,
+          status: AppConstants.statusPending,
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        await fs.submitMaintenanceRequest(request);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Request submitted! You\'ll be notified of updates.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        // ── Offline path — save to Hive queue, sync later ──────────────
+        // Images are skipped when offline; they can be added after sync.
+        final pendingMap = {
+          'requestId': requestId,
+          'studentUid': user.uid,
+          'roomId': 'unassigned_${user.uid}',
+          'title': _titleController.text.trim(),
+          'description': _descController.text.trim(),
+          'category': _selectedCategory ?? 'General',
+          'roomNumber': user.roomNumber,
+          'hostelName': user.hostel,
+          'imageUrls': <String>[],
+          'status': AppConstants.statusPending,
+          'assignedTo': '',
+          'createdAt': now.toIso8601String(),
+          'updatedAt': now.toIso8601String(),
+        };
+
+        await ref.read(offlineServiceProvider).savePendingRequest(pendingMap);
+
+        // Keep the badge count in sync.
+        ref.read(pendingRequestCountProvider.notifier).state =
+            ref.read(offlineServiceProvider).pendingCount;
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You\'re offline — request saved and will sync automatically when you reconnect.',
+            ),
+            backgroundColor: AppColors.warning,
+            duration: Duration(seconds: 4),
+          ),
+        );
       }
 
-      final now = DateTime.now();
-      final request = MaintenanceRequest(
-        requestId: requestId,
-        studentUid: user.uid,
-        roomId: roomId,
-        title: _titleController.text.trim(),
-        description: _descController.text.trim(),
-        category: _selectedCategory ?? 'General',
-        roomNumber: user.roomNumber,
-        hostelName: user.hostel,
-        imageUrls: imageUrls,
-        status: AppConstants.statusPending,
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      await fs.submitMaintenanceRequest(request);
-
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Request submitted! You\'ll be notified of updates.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
       context.pop();
     } catch (e) {
       if (!mounted) return;

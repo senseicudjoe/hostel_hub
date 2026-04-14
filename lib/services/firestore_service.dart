@@ -229,6 +229,16 @@ class FirestoreService {
     return request.requestId;
   }
 
+  /// Used by [OfflineService.flush] to write a raw map that was saved while
+  /// offline.  The map must already contain a valid `requestId` field.
+  Future<void> submitPendingRequest(Map<String, dynamic> data) async {
+    final requestId = data['requestId'] as String;
+    await _db
+        .collection(AppConstants.maintenanceCollection)
+        .doc(requestId)
+        .set(data);
+  }
+
   Stream<List<MaintenanceRequest>> getStudentMaintenanceRequests(String studentUid) {
     // Note: Avoiding `.orderBy('createdAt')` here removes the need for a composite
     // index (studentUid + createdAt). We sort client-side instead.
