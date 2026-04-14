@@ -27,7 +27,9 @@ class _AmbientDarkModeScreenState
   Widget build(BuildContext context) {
     final notifier = ref.read(themeModeProvider.notifier);
     final themeMode = ref.watch(themeModeProvider);
-    final config = notifier.config;
+    // Watch the config provider so the screen rebuilds when the strategy
+    // changes even if the resulting ThemeMode stays the same.
+    final config = ref.watch(darkModeConfigProvider);
     final isDark = themeMode == ThemeMode.dark;
 
     return Scaffold(

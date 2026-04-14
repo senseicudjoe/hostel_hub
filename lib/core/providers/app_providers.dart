@@ -154,13 +154,27 @@ class DarkModeConfig {
   }
 }
 
+/// Reactive mirror of [DarkModeConfig] — watched by the settings and profile
+/// screens so they rebuild whenever the strategy or config changes, even when
+/// the effective [ThemeMode] stays the same (e.g. switching from Sensor to
+/// Manual when both currently resolve to light mode).
+final darkModeConfigProvider = StateProvider<DarkModeConfig>((ref) {
+  try {
+    return DarkModeConfig.fromHive(Hive.box(AppConstants.settingsBox));
+  } catch (_) {
+    return const DarkModeConfig();
+  }
+});
+
 /// Manages the effective [ThemeMode] based on the user's chosen strategy.
 /// Handles side-effects (timers, sensor streams) internally and cleans up
 /// when strategies change or the notifier is disposed.
 class AmbientThemeNotifier extends StateNotifier<ThemeMode> {
-  AmbientThemeNotifier() : super(ThemeMode.light) {
+  AmbientThemeNotifier(this._ref) : super(ThemeMode.light) {
     _init();
   }
+
+  final Ref _ref;
 
   DarkModeConfig _config = const DarkModeConfig();
   Timer? _scheduleTimer;
@@ -183,6 +197,11 @@ class AmbientThemeNotifier extends StateNotifier<ThemeMode> {
           manualDark: legacyDark,
         );
         _config.save(box);
+        // Sync the reactive config provider after legacy migration so the
+        // settings screen sees the migrated value immediately.
+        try {
+          _ref.read(darkModeConfigProvider.notifier).state = _config;
+        } catch (_) {}
       } else {
         _config = DarkModeConfig.fromHive(box);
       }
@@ -195,6 +214,12 @@ class AmbientThemeNotifier extends StateNotifier<ThemeMode> {
     _config = newConfig;
     try {
       newConfig.save(Hive.box(AppConstants.settingsBox));
+    } catch (_) {}
+    // Sync the reactive config provider so the settings and profile screens
+    // rebuild even when ThemeMode doesn't change (e.g. switching strategy
+    // between two modes that both currently resolve to the same ThemeMode).
+    try {
+      _ref.read(darkModeConfigProvider.notifier).state = newConfig;
     } catch (_) {}
     _applyStrategy();
   }
@@ -289,7 +314,7 @@ class AmbientThemeNotifier extends StateNotifier<ThemeMode> {
 }
 
 final themeModeProvider = StateNotifierProvider<AmbientThemeNotifier, ThemeMode>(
-  (_) => AmbientThemeNotifier(),
+  (ref) => AmbientThemeNotifier(ref),
 );
 
 /// Live lux stream — only active while the ambient-dark-mode settings screen

@@ -29,7 +29,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final notifPrefs = ref.watch(notificationPrefsProvider);
     final biometricEnabled = ref.watch(biometricEnabledProvider);
     final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
-    final config = ref.read(themeModeProvider.notifier).config;
+    final config = ref.watch(darkModeConfigProvider);
 
     final initials =
         user?.name
